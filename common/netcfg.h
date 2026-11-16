@@ -27,6 +27,8 @@ void net_send(const char *address, const char *types, ...);
 void net_edit_settings(void);
 void net_edit_host(void);   // just the IP
 void net_edit_port(void);   // just the port
+// System number pad (with . and -). Returns false if cancelled.
+bool keyboard_number(const char *hint, float initial, float *out);
 
 // This 3DS's IP as a dotted string.
 const char *net_local_ip(void);

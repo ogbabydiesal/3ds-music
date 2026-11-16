@@ -51,6 +51,7 @@ typedef struct {
     float    wt[SYN_WT_SIZE];       // custom waveform, -1..1
     int      input;                 // source node index, -1 = none
     uint8_t  outputs;               // bit t = output for shape t
+    int8_t   mod_src[SYN_MAX_PARAMS];   // step sequencer (0..7) driving each param, -1 = none
 
     // runtime (audio thread)
     float    out;
@@ -75,6 +76,8 @@ void syn_set_param(int node, int k, float v);
 void syn_set_wave_point(int node, int i, float v);
 void syn_toggle_output(int node, int track);
 void syn_clear_outputs(int node);
+void syn_set_mod_src(int node, int k, int seq);    // -1 = none
+float syn_clamp_param(const ParamDef *d, float v);  // keep v inside the parameter's range
 // Replace the whole patch (e.g. loading a slot). Copies used/type/x/y/p/wt/input/outputs.
 void syn_replace_all(const SynNode src[SYN_MAX_NODES]);
 

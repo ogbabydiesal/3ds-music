@@ -154,7 +154,7 @@ The OSC, gyro and accel choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3
 |---|---|
 | ![Save slots](docs/screenshots/store-1-save.png) | ![Song editor](docs/screenshots/store-2-song.png) |
 
-- **SAVE:** tap a slot to store the current **pattern** (BPM plus all five tracks' DIVS, PULSES, ROTATE and mute), the **synth patch** and the **STEPS lanes**. Saving over a used slot replaces it without asking. Each tile shows the BPM and a coloured square for each active track; a dark square means that track is muted.
+- **SAVE:** tap a slot to store the current **pattern** (BPM plus all five tracks' DIVS, PULSES, ROTATE and mute), the **synth patch** and the **step sequencers S1–S8**. Saving over a used slot replaces it without asking. Each tile shows the BPM and a coloured square for each active track; a dark square means that track is muted.
 - **LOAD:** tap a used slot to restore its pattern and synth patch.
 - **SONG:** strings slots together. Each step is "slot × bars", up to 16 steps, and the chain loops.
   - Tap **+** to add a step, which copies the selected one. Tap a step to select it, then change its **SLOT** and **BARS**. **DEL STEP** removes it.
@@ -164,18 +164,22 @@ The OSC, gyro and accel choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3
   - A step pointing at an empty slot shows its number in red and keeps the current pattern.
 - Files are stored in `sdmc:/3ds/osc3ds/eucseq/` (`slot1.txt` … `slot8.txt`, `song.txt`). They're plain text.
 
-### STEPS page (parameter step sequencer)
+### STEPS page (step sequencers S1–S8)
 
-![STEPS page](docs/screenshots/steps-1-lane.png)
+| S1 playing a melody | Assigning S1 to an oscillator's FREQ |
+|---|---|
+| ![STEPS page](docs/screenshots/steps-1-lane.png) | ![Assigning in node settings](docs/screenshots/steps-2-assign.png) |
 
-The third page, after SEQUENCER and SYNTH (use **< >**), holds four step-sequencer **lanes**, **A–D**. Each lane is a row of sliders that steps a synth parameter:
-- **TRIG:** which shape's pulses advance the lane. Every pulse moves to the next slider and sets the parameter just before that pulse's note plays. After the last slider it loops to the first. PLAY restarts every lane at step 1.
-- **TARGET:** pick a synth node with **< >** (nodes are numbered on the SYNTH canvas, e.g. "OSC 4"), then one of its parameters with the second **< >**. That includes FREQ, PW, MOD, LEVEL, every ADSR value, noise TYPE and the OSC WAVE. New node types such as filters will show up here automatically.
-- **MIN / MAX:** drag to set the range. It's shown in the parameter's units, and MIN can be above MAX to invert.
+The third page, after SEQUENCER and SYNTH (use **< >**), has **8 step sequencers, S1–S8**. Each one is a row of sliders:
+- **TRIG:** which shape's pulses advance it. Every pulse moves to the next slider, just before that pulse's note plays. After the last slider it loops to the first, and PLAY restarts all of them at step 1.
 - **STEPS:** 1–16 sliders.
-- **Sliders:** drag across them to draw values. The playing step is outlined, and the readout shows the value of the step you touched.
-- Lanes with a target show a small coloured dot on their tab. Exponential parameters (FREQ, times) scale musically: halfway between 110 and 440 Hz is 220 Hz.
-- Lanes are saved in slots along with the synth patch.
+- **MIN / MAX:** tap to type plain numbers on the 3DS keypad (`.` and `-` work). The output is `MIN + (MAX − MIN) × slider`, so you pick the range that suits the parameter, e.g. 55 to 220 for Hz, or 20 to 400 for a decay in ms.
+- **Sliders:** drag across them to draw. The playing step is outlined, and the readout shows the touched step's value.
+- The row under MIN/MAX lists what the selected sequencer **drives**. A small dot on a tab means that sequencer is in use.
+
+**Assign in the instrument:** open a node's settings on the SYNTH page. Each parameter row has a small **S** box at its right edge; tap it to cycle **–, S1 … S8**. The box takes the sequencer's trigger colour, and the value turns green while it's driven. One sequencer can drive any number of parameters, on any nodes. Values outside a parameter's range are clamped, so a wrong MIN/MAX can't break anything. New node types, such as filters, get S boxes automatically.
+
+Sequencers and their assignments are saved in slots along with the synth patch. Pasted nodes keep their assignments.
 
 ### SYNTH page
 

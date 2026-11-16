@@ -1,37 +1,36 @@
-// STEPS page: parameter step sequencers.
+// STEPS page: 8 step sequencers (S1-S8).
 //
-// Four lanes (A-D). Each lane is a row of 1..16 sliders. Every pulse of the
-// lane's TRIG shape advances it to the next slider (looping after the last)
-// and sets the TARGET synth parameter to that slider's value, scaled between
-// MIN and MAX in the parameter's own units, just before the note plays.
+// Each sequencer is a row of 1..16 sliders with a plain numeric MIN and MAX.
+// Every pulse of its TRIG shape advances it to the next slider (looping after
+// the last). Its value  MIN + (MAX - MIN) * slider  is written to every synth
+// parameter assigned to it; assignments are made per parameter in the node's
+// settings box on the SYNTH page. Values are clamped to each parameter's range.
 #pragma once
 #include <stdbool.h>
 
-#define MOD_LANES      4
+#define MOD_SEQS       8
 #define MOD_MAX_STEPS  16
 
 typedef struct {
-    int   node;                 // synth node index, -1 = no target
-    int   param;                // parameter index within that node's class
-    int   trig;                 // shape 0..4 whose pulses advance the lane
+    int   trig;                 // shape 0..4 whose pulses advance it
     int   nsteps;               // 1..MOD_MAX_STEPS
-    float min_u, max_u;         // range, as 0..1 positions on the parameter's scale
-    float v[MOD_MAX_STEPS];     // slider values 0..1
+    float min, max;             // output range, plain numbers
+    float v[MOD_MAX_STEPS];     // slider positions 0..1
     volatile int cur;           // last played step, -1 = none yet
-} ModLane;
+} ModSeq;
 
-extern ModLane mod_lanes[MOD_LANES];
+extern ModSeq mod_seqs[MOD_SEQS];
 
-void mod_init(void);
-void mod_defaults(ModLane out[MOD_LANES]);   // fresh lanes (no target)
-void mod_reset(void);               // playback (re)starts: next pulse plays step 1
-void mod_on_pulse(int track);       // sequencer thread, before the synth is triggered
-bool mod_lane_valid(const ModLane *l);
-float mod_lane_value(const ModLane *l, int step);   // in the target parameter's units
-void mod_set_all(const ModLane src[MOD_LANES]);     // loading a slot
+void  mod_defaults(ModSeq out[MOD_SEQS]);
+void  mod_init(void);
+void  mod_reset(void);              // playback (re)starts: next pulse plays step 1
+void  mod_on_pulse(int track);      // sequencer thread, before the synth is triggered
+float mod_seq_value(const ModSeq *m, int step);
+void  mod_set_all(const ModSeq src[MOD_SEQS]);   // loading a slot
+int   mod_seq_targets(int seq);     // how many synth parameters it drives
 
 // UI (page 3)
 #define MOD_AREA_Y0 24
 #define MOD_AREA_Y1 202
-void mod_page_touch(bool down, bool held, bool up, int x, int y);
+void mod_page_touch(bool down, bool held, bool up, int x, int y);   // may open the keypad
 void mod_page_draw(void);

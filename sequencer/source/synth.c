@@ -98,6 +98,7 @@ static int add_node_locked(NodeType type, float x, float y) {
         n->x = x; n->y = y;
         n->input = -1;
         n->outputs = 0;
+        memset(n->mod_src, -1, sizeof n->mod_src);
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
         const NodeClass *c = &syn_classes[type];
         for (int k = 0; k < c->nparams; k++) n->p[k] = c->params[k].def;
@@ -122,6 +123,7 @@ int syn_add_copy(const SynNode *src, float x, float y) {
     if (i >= 0) {
         memcpy(syn_nodes[i].p, src->p, sizeof src->p);
         memcpy(syn_nodes[i].wt, src->wt, sizeof src->wt);
+        memcpy(syn_nodes[i].mod_src, src->mod_src, sizeof src->mod_src);
     }
     rebuild();
     GRAPH_UNLOCK();
@@ -172,6 +174,18 @@ void syn_set_wave_point(int node, int i, float v) {
     GRAPH_UNLOCK();
 }
 
+void syn_set_mod_src(int node, int k, int seq) {
+    if (k < 0 || k >= SYN_MAX_PARAMS) return;
+    syn_nodes[node].mod_src[k] = (int8_t)(seq >= 0 && seq < 8 ? seq : -1);
+}
+
+float syn_clamp_param(const ParamDef *d, float v) {
+    if (v < d->min) v = d->min;
+    if (v > d->max) v = d->max;
+    if (d->kind == PARAM_ENUM) v = floorf(v + 0.5f);
+    return v;
+}
+
 void syn_toggle_output(int node, int track) {
     GRAPH_LOCK();
     syn_nodes[node].outputs ^= (uint8_t)(1u << track);
@@ -199,6 +213,8 @@ void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
         memcpy(n->wt, src[i].wt, sizeof n->wt);
         n->input = src[i].input;
         n->outputs = src[i].outputs & 0x1F;
+        for (int k = 0; k < SYN_MAX_PARAMS; k++)
+            n->mod_src[k] = (src[i].mod_src[k] >= 0 && src[i].mod_src[k] < 8) ? src[i].mod_src[k] : -1;
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
     }
     for (int i = 0; i < SYN_MAX_NODES; i++) {          // drop links to missing nodes / loops

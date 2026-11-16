@@ -107,6 +107,23 @@ static bool keyboard_input(const char *hint, const char *initial, char *out, siz
     return true;
 }
 
+bool keyboard_number(const char *hint, float initial, float *out) {
+    SwkbdState kb;
+    swkbdInit(&kb, SWKBD_TYPE_NUMPAD, 2, 12);
+    swkbdSetNumpadKeys(&kb, L'.', L'-');           // decimal point + minus
+    swkbdSetHintText(&kb, hint);
+    char init[24], tmp[24];
+    snprintf(init, sizeof init, "%g", initial);
+    swkbdSetInitialText(&kb, init);
+    swkbdSetValidation(&kb, SWKBD_NOTEMPTY_NOTBLANK, 0, 0);
+    if (swkbdInputText(&kb, tmp, sizeof tmp) != SWKBD_BUTTON_CONFIRM) return false;
+    char *end;
+    float v = strtof(tmp, &end);
+    if (end == tmp) return false;
+    *out = v;
+    return true;
+}
+
 void net_edit_host(void) {
     char buf[64];
     if (keyboard_input("Target IP address", net_cfg.host, buf, sizeof buf)) {

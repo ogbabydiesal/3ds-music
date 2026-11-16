@@ -1,3 +1,4 @@
+#include "modseq.h"
 #include "page_synth.h"
 #include "synth.h"
 #include "ui.h"
@@ -35,8 +36,11 @@
 #define POP_ROW_H   19
 #define POP_TITLE_H 24
 #define POP_BAR_X   (POP_X + 84)
-#define POP_BAR_W   120
+#define POP_BAR_W   100
 #define POP_SEG_W   (POP_W - 84 - 8)
+#define POP_SRC_W   26                         // S1..S8 step-sequencer box, right end of a row
+#define POP_SRC_X   (POP_X + POP_W - 8 - POP_SRC_W)
+#define POP_ENUM_W  (POP_SEG_W - POP_SRC_W - 6)
 #define WAVE_ED_H   44
 
 // Toolbar buttons
@@ -64,6 +68,7 @@ static SynNode clip[SYN_MAX_NODES];
 static int   clip_input[SYN_MAX_NODES], nclip = 0, paste_count = 0;
 
 bool synth_page_popup_open(void) { return popup >= 0; }
+void synth_page_open_popup(int node) { if (node >= 0 && node < SYN_MAX_NODES && syn_nodes[node].used) popup = node; }
 
 // --------------------------------------------------------------- helpers ---
 
@@ -219,7 +224,7 @@ static float buttons_y(int node) { return out_y(node) + POP_ROW_H + 11; }
 static void set_param_from_x(int node, int k, int x) {
     const ParamDef *d = &syn_classes[syn_nodes[node].type].params[k];
     if (d->kind == PARAM_ENUM) {
-        int seg = (int)((x - POP_BAR_X) / (POP_SEG_W / (float)d->nlabels));
+        int seg = (int)((x - POP_BAR_X) / (POP_ENUM_W / (float)d->nlabels));
         if (seg < 0) seg = 0;
         if (seg >= d->nlabels) seg = d->nlabels - 1;
         syn_set_param(node, k, d->min + seg);
@@ -255,7 +260,12 @@ static void popup_touch_down(int x, int y) {
     for (int k = 0; k < c->nparams; k++) {
         float ry = row_y(node, k);
         if (y < ry || y >= ry + POP_ROW_H) continue;
-        float w = c->params[k].kind == PARAM_ENUM ? POP_SEG_W : POP_BAR_W;
+        if (x >= POP_SRC_X - 2) {                          // cycle: none, S1..S8, none
+            int cur = syn_nodes[node].mod_src[k];
+            syn_set_mod_src(node, k, cur + 1 >= MOD_SEQS ? -1 : cur + 1);
+            return;
+        }
+        float w = c->params[k].kind == PARAM_ENUM ? POP_ENUM_W : POP_BAR_W;
         if (x >= POP_BAR_X - 6 && x < POP_BAR_X + w + 6) {
             set_param_from_x(node, k, x);
             if (c->params[k].kind != PARAM_ENUM) { drag = DRAG_PARAM; drag_param = k; }
@@ -305,8 +315,9 @@ void synth_page_draw_popup(void) {
         const ParamDef *d = &c->params[k];
         float ry = row_y(node, k);
         text(POP_X + 8, ry + 3, 0.4f, COL_DIM, 0, "%s", d->name);
+        int src = n->mod_src[k];
         if (d->kind == PARAM_ENUM) {
-            float sw = POP_SEG_W / (float)d->nlabels;
+            float sw = POP_ENUM_W / (float)d->nlabels;
             for (int s = 0; s < d->nlabels; s++) {
                 bool on = (int)n->p[k] == (int)d->min + s;
                 float bx = POP_BAR_X + s * sw;
@@ -321,8 +332,14 @@ void synth_page_draw_popup(void) {
             C2D_DrawRectSolid(POP_BAR_X, ry + 6, 0.5f, POP_BAR_W * u, 7, COL_ACCENT);
             char v[24];
             format_value(d, n->p[k], v, sizeof v);
-            text(POP_X + POP_W - 8, ry + 3, 0.4f, COL_FG, C2D_AlignRight, "%s", v);
+            text(POP_SRC_X - 5, ry + 3, 0.4f, src >= 0 ? COL_ACCENT : COL_FG, C2D_AlignRight, "%s", v);
         }
+        // Step sequencer driving this parameter (tap to cycle -, S1..S8)
+        C2D_DrawRectSolid(POP_SRC_X, ry + 2, 0.5f, POP_SRC_W, POP_ROW_H - 4,
+                          src >= 0 ? track_color(mod_seqs[src].trig, 0, false) : C2D_Color32(24, 29, 35, 255));
+        rect_outline(POP_SRC_X, ry + 2, POP_SRC_W, POP_ROW_H - 4, COL_LINE);
+        if (src >= 0) text(POP_SRC_X + POP_SRC_W / 2.0f, ry + 3, 0.34f, C2D_Color32(10, 12, 16, 255), C2D_AlignCenter, "S%d", src + 1);
+        else text(POP_SRC_X + POP_SRC_W / 2.0f, ry + 3, 0.34f, COL_DIM, C2D_AlignCenter, "S");
     }
 
     // Custom waveform editor: 16 bars, draw with the stylus

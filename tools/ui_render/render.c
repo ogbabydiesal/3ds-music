@@ -57,6 +57,7 @@ volatile unsigned long net_sent = 0, net_errors = 0;
 void net_send(const char *a, const char *t, ...) { (void)a; (void)t; }
 void net_edit_host(void) {}
 void net_edit_port(void) {}
+bool keyboard_number(const char *h, float i, float *o) { (void)h; (void)i; (void)o; return false; }
 const char *net_local_ip(void) { return "192.168.1.160"; }
 Result HIDUSER_EnableAccelerometer(void) { return 0; }
 Result HIDUSER_DisableAccelerometer(void) { return 0; }
@@ -306,21 +307,27 @@ int main(int argc, char **argv) {
     render(OUT("store-2-song.png"), true);
     store_ui_close();
 
-    // STEPS page: lane A plays a melody on the kick OSC's FREQ (sphere pulses),
-    // lane B steps the hi-hat ENV decay (cube pulses)
+    // STEPS page: S1 plays a melody on the kick OSC's FREQ (sphere pulses);
+    // S2 steps the hi-hat ENV decay (cube pulses). Assignments live in the nodes.
     scene_page = 2;
-    ModLane *A = &mod_lanes[0], *B = &mod_lanes[1];
-    const ParamDef *fd = &syn_classes[NODE_OSC].params[OSC_FREQ];
-    B->node = 1; B->param = ENV_D; B->trig = 0; B->nsteps = 4;
-    A->node = os; A->param = OSC_FREQ; A->trig = 1; A->nsteps = 8;
-    A->min_u = syn_param_to_norm(fd, 55); A->max_u = syn_param_to_norm(fd, 220);
+    ModSeq *S1 = &mod_seqs[0], *S2 = &mod_seqs[1];
+    S1->trig = 1; S1->nsteps = 8; S1->min = 55; S1->max = 220;
     const float mel[8] = { 0, .5f, .25f, .75f, 0, 1, .5f, .38f };
-    for (int i = 0; i < 8; i++) A->v[i] = mel[i];
+    for (int i = 0; i < 8; i++) S1->v[i] = mel[i];
+    S2->trig = 0; S2->nsteps = 4; S2->min = 40; S2->max = 300;
+    syn_set_mod_src(os, OSC_FREQ, 0);
+    syn_set_mod_src(1, ENV_D, 1);
     mod_reset();
     for (int i = 0; i < 3; i++) mod_on_pulse(1);  // now playing step 3
     mod_page_touch(true, true, false, 4 + 5 * 39 + 10, 150);   // touch slider 6 (sets it + readout)
     mod_page_touch(false, false, true, 4 + 5 * 39 + 10, 150);
     render(OUT("steps-1-lane.png"), true);
+
+    // OSC settings with FREQ driven by S1
+    scene_page = 1;
+    synth_page_open_popup(os);
+    render(OUT("steps-2-assign.png"), true);
+    tap(2, 2);
     store_ui_close();
     return 0;
 }

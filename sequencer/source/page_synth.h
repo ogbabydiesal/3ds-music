@@ -8,6 +8,7 @@
 #define SYNTH_AREA_Y1   202
 
 bool synth_page_popup_open(void);
+void synth_page_open_popup(int node);   // open a node's settings box
 // Called every frame while this page owns the touch. down/up are edge flags.
 void synth_page_touch(bool down, bool held, bool up, int x, int y);
 // Hardware buttons while the page is showing (L/R zoom, D-pad pan).

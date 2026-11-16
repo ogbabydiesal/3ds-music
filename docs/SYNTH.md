@@ -17,7 +17,7 @@ From top to bottom:
 | **Header** | Page name; **SAVE / LOAD / SONG**, where slots store the pattern and this synth patch; and the **settings gear**: OSC output on/off, target IP/port, gyro and accel over OSC. The gear is green while OSC is on. |
 | **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. **<** / **>** scroll the carousel once there are more classes. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
-| **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. Each node shows its number (e.g. "OSC 4"), which is how the **STEPS** page picks targets. |
+| **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. Each node shows its number (e.g. "OSC 4"), which the STEPS page uses when listing what each sequencer drives. |
 | **Bottom bar** | PLAY/STOP, BPM, and the **< >** page arrows. These are the same on every page. |
 
 The starter patch is **NOISE (white) → ENV**, with the ENV output on shape 1 (the red cube). Press PLAY and you hear a short noise tick on every cube pulse, like a closed hi-hat.
@@ -73,6 +73,7 @@ Tap a node, without dragging, to open its settings.
 ![ENV settings](screenshots/synth-2-env-settings.png)
 
 - **Sliders:** tap or drag anywhere on the bar.
+- **S box** (right end of each row): tap to cycle **–, S1 … S8** to have a step sequencer from the STEPS page drive this parameter. It's shown in the sequencer's trigger colour, with the value in green while driven.
 - **Choices** (WAVE, TYPE): tap a segment.
 - **OUTPUT:** **OFF** by default. Tap shape numbers **1–5** to make this node an output for those shapes; you can pick several. Tap **OFF** to clear them all. Under the row, the chosen shapes are listed by name.
   - **Only output nodes are heard.** A NOISE patched into an ENV is silent by itself; you hear it only through the ENV, and only when the ENV is an output for a shape that fires.
@@ -117,7 +118,7 @@ Here the kick chain was copied and pasted, dragged below the original, retuned t
 
 ## Stepping parameters
 
-Any node setting can be stepped per pulse from the **STEPS** page, the third page: pick a node by its number, a parameter, a MIN/MAX range, and draw the values. See the README's STEPS section.
+Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** page. Assign it with the setting's **S box** here, then set that sequencer's trigger shape, MIN/MAX numbers and sliders on the STEPS page. See the README's STEPS section.
 
 ## Sound output
 
