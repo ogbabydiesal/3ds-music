@@ -1,0 +1,54 @@
+# How this project was built
+
+Everything in this repo was written in one conversation with an AI coding agent. The author described what they wanted, tested each build on a real 3DS or in the Azahar emulator, and reported back.
+
+| | |
+|---|---|
+| **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
+| **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
+| **Dates** | Nov 15, 2026 01:51 → Nov 15, 2026 23:30 (US Eastern), about 21½ hours of calendar time, most of it the author away or testing |
+| **Claude's working time** | **about 35–40 minutes** in total |
+| **Prompts** | 16 written prompts, plus short button replies, a pasted installer log, and build/send commands run from the chat box |
+
+**About the working time:** it's measured from the session transcript timestamps, from each prompt to the end of Claude's reply. It includes thinking, writing code and waiting on tools such as compiles and installs. Reasoning time can't be separated out, because the transcript doesn't record it. The three biggest turns were the first sequencer (~8 min), the synth page (~6.6 min), and oscillators with zoom, box select and copy/paste (~4.7 min).
+
+## Prompts, in order
+
+Times are US Eastern. "Work" is Claude's time on that turn.
+
+| # | Time | Work | Prompt |
+|---|---|---|---|
+| 1 | Nov 15 01:51 | 2.8 min | i have a 3ds i would like to make a custom osc application for it |
+| 2 | 01:54 | 0.7 min | *(button)* Yes, install & build |
+| 3 | 01:58 | 0.6 min | *(pasted the devkitPro installer output showing a "GPGME error: Invalid crypto engine")* |
+| 4 | 01:59 | 0.3 min | *(button)* Done, build it |
+| 5 | 12:54 | 0.4 min | works great, how can we emulate it on the mac to preview things before we send to the device? |
+| 6 | 16:57 | 0.3 min | i downloaded it and was able to test my app |
+| 7 | 16:59 | 0.1 min | what language did you use to program the sample? |
+| 8 | 17:08 | 8.1 min | i would like to make a euclidian sequencer, the top 3D screen should center a circle, drawn as a simple thin line using the 3d lenticular display , allow me to change the bpm on the bottom screen, i should be able to subdivide the circle with smallish 3d wireframe primitive objects, they can be rendered in primary colors, a small 5-point star traverses the circumference of the circle, each time it touches the center of a primitive, it sends an osc message like "/shape_1/pulse" |
+| 9 | 17:21 | 3.5 min | cool, it's close, however I would like to be able to have n (subdivision) number  of cubes, a separate number of spheres, pyramids and so on, let's start with 5 shapes, each shape sends osc on it's own "track" , the bottom screen allows me to mute (dim the color) of the shape, and create more subdivisions of the circle to create more cubes, or spheres, or whatever object is selected |
+| 10 | 17:26 | 0.1 min | don't control my computer anymore, when you finish ask me to test it |
+| 11 | 17:32 | 0.5 min | keep all objects on the line unless i press an "expand" toggle |
+| 12 | 17:36 | 0.2 min | *(ran)* `make -C sequencer run`, which failed with "Please set DEVKITARM" and led to the Makefiles defaulting to `/opt/devkitpro` |
+| 13 | 17:46 | 0.6 min | the rotate isn't working as i would expect it to, when i modify that parameter i would expect the shape i've sellected to move that many degrees along the circle |
+| 14 | 22:42 | 0.1 min | what is the command to send to the 3ds wirelessly? |
+| 15 | 22:43 | 0.2 min | *(ran)* `make -C sequencer send`, which gave "No response from 3DS!" |
+| 16 | 22:44 | 0.3 min | the 3dslink netloader says Waiting for 3dslink to connect... ip addr: 192.168.1.160, Port: 17491 |
+| 17 | 22:54 | 0.4 min | let's create a make some room for some buttons to add pages of effects and sounds, start by placing the set IP button next to the ip address at the top of the bottom screen |
+| 18 | 23:04 | 6.6 min | add two arrow buttons where the Set IP button was, < and >, let's start with, the first page which is for simple synthesis, I want to be able to patch together units like noise, oscillators (sine, triangle, saw, square, custom wave shapes, etc...), and envelopes together to great instruments that are assignable to the shapes on the first page, let's start with a canvas area, that takes up at least the width and height of the DIVS, Pulses, Rotate rows from the first page, above that include a carousel of the sound making classes, let's start with a noise class (pink, white, brown), and and envelope class, allow me to attenuate each node by selecting it and modifying the settings of it in a popup box, keep the interface minimal, squares, arial font, allow me to assign it to a shape in that menu |
+| 19 | 23:15 | 0.9 min | only the designated output node (configured in the settings of that node (off by default)) outputs to the shape, as it stands currently, each class is sending to the shape, i should be able to attach the noise node to the envelope, and only hear the output of the envelope by assigning it to the desired shape |
+| 20 | 23:21 | 4.7 min | it works, i should be able to assign to multiple shapes if i want to, add an oscillator node with the wave shapes i mentioned above, allow me to zoom in and out of the synthesis canvas, box select networks of nodes, copy and paste |
+| 21 | 23:30 | *this turn* | make a repo and push it with documentation and screenshots, also create a list of the prompts that i used to create the project so far including this one, what model I used, and approximately how long you spent thinking on this |
+
+The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` several more times from the chat box to preview and deploy builds. Those runs needed little or no work from Claude, so they're left out of the table.
+
+## What each step produced
+
+1. **osc3ds**: an OSC controller app, a portable OSC encoder, a Python OSC monitor, and the devkitPro install on macOS, including working around a pacman GPG `PATH` problem.
+2. **Azahar preview**: `make run` and `make send` targets.
+3. **eucseq v1**: a stereoscopic ring drawn per eye with off-axis projection, Euclidean E(k,n) shapes, a travelling star, and a 1 ms timing thread sending `/shape_N/pulse`.
+4. **eucseq v2**: 5 shape tracks (cube, sphere, pyramid, diamond, cylinder) with independent DIVS / PULSES / ROTATE and mute, plus the EXPAND toggle, rotation in degrees, and shared `common/` code.
+5. **SYNTH page**:
+   - An audio engine on NDSP: noise, envelope and polyBLEP oscillators with a custom 16-point wave.
+   - The patch canvas: carousel, cables, settings popup, multi-shape outputs, zoom and pan, box select, copy/paste.
+   - The Arial UI font, converted to `.bcfnt` at build time.

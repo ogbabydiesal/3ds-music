@@ -1,0 +1,150 @@
+# 3ds-music
+
+Homebrew music tools for the Nintendo 3DS, written in C with [libctru](https://github.com/devkitPro/libctru) and citro2d. Two apps:
+
+- **osc3ds** turns the 3DS into a wireless **OSC controller**: buttons, sticks, an XY pad, faders, drum pads and motion sensors, sent over UDP on Wi-Fi.
+- **eucseq** is a **stereoscopic 3D polyrhythmic / Euclidean sequencer** with a built-in **modular synth**. Five wireframe shape tracks orbit a ring on the 3D top screen. Each pulse sends OSC (`/shape_N/pulse`) and can play patches you build from oscillators, noise and envelopes on the touchscreen.
+
+Both apps work with any OSC host, such as Max/MSP, Ableton (via Max/Connection Kit), TouchDesigner, Pure Data, Resolume, VCV Rack, SuperCollider, Bitwig or Reaper.
+
+## Screenshots
+
+These are from the Azahar emulator on earlier builds. The current build differs in several ways:
+- Shapes sit on the ring until you press EXPAND.
+- SET IP is in the header, with < > page arrows in the bottom bar.
+- The UI font is Arial.
+- There's a SYNTH page.
+
+| 5 tracks playing (sphere muted, diamond lane added) | 5 tracks stopped |
+|---|---|
+| ![eucseq playing](docs/screenshots/eucseq-tracks-playing.jpg) | ![eucseq stopped](docs/screenshots/eucseq-tracks-stopped.jpg) |
+
+First version (one Euclidean pattern, top screen):
+
+![eucseq v1](docs/screenshots/eucseq-v1-top-screen.jpg)
+
+## How this was made
+
+The whole project was built in one conversation with **Claude Opus 5.5** in Claude Code. See [docs/PROMPTS.md](docs/PROMPTS.md) for every prompt, in order, plus timing.
+
+## Requirements
+
+- A 3DS with custom firmware and the Homebrew Launcher ([3ds.hacks.guide](https://3ds.hacks.guide)).
+- The 3DS and your computer on the same Wi-Fi network.
+- The devkitPro toolchain (to build):
+  1. Install the devkitPro pacman package from <https://github.com/devkitPro/pacman/releases> (macOS `.pkg`).
+  2. `sudo env PATH=/opt/devkitpro/pacman/bin:/usr/bin:/bin pacman -Sy 3ds-dev`. Setting PATH lets pacman find its bundled `gpg`. Without it, macOS fails with "GPGME error: Invalid crypto engine".
+  3. The Makefiles default to `/opt/devkitpro`, so you don't need to export anything.
+
+## Build and install (osc3ds)
+
+```bash
+make
+```
+
+Copy `osc3ds.3dsx` to `/3ds/` on the SD card, then launch it from the Homebrew Launcher.
+
+**Preview on the Mac:** run `make run`. It builds the app and opens it in the [Azahar](https://github.com/azahar-emu/azahar) emulator. The mouse acts as the touchscreen, and right-click-drag tilts the virtual 3DS for motion. To point it at a specific Azahar install, use `make run AZAHAR=/path/to/Azahar.app`.
+
+**Send to the 3DS:** in the Homebrew Launcher press **Y** (NetLoader), then run `make send`. The app is sent over Wi-Fi with no SD swapping. If it says "No response from 3DS!", add the IP address the 3DS shows: `make send IP=192.168.0.50`.
+
+## Setup
+
+1. Find your computer's IP: `ipconfig getifaddr en0`.
+2. In the app, press **SELECT** and enter that IP and the port your OSC host listens on. This is saved to `sdmc:/3ds/osc3ds/config.ini`.
+3. Check that it works with the bundled monitor:
+   ```bash
+   python3 tools/osc_monitor.py 9000
+   ```
+
+## Controls
+
+| Input | OSC address | Args |
+|---|---|---|
+| A B X Y L R ZL ZR, D-pad | `/3ds/button/{a,b,x,y,l,r,zl,zr,up,down,left,right}` | `1.0` press, `0.0` release |
+| Circle pad | `/3ds/circle` | `x y`, -1 to 1 |
+| C-stick (New 3DS) | `/3ds/cstick` | `x y`, -1 to 1 |
+| **XY tab** | `/3ds/xy` · `/3ds/xy/touch` | `x y`, 0 to 1 · `1`/`0` |
+| **FADERS tab** (4) | `/3ds/fader/1` … `/3ds/fader/4` | 0 to 1 |
+| **PADS tab** (4×3) | `/3ds/pad/1` … `/3ds/pad/12` | `1.0` hit, `0.0` release |
+| **MOTION tab** toggle | `/3ds/accel` · `/3ds/gyro` · `/3ds/motion/enabled` | `x y z` (accel ≈ 1.0 = 1g) at about 30 Hz |
+| App start | `/3ds/hello` | `1.0` |
+
+- **SELECT** sets the target IP and port. **START** quits.
+- The bottom screen's top strip holds the tabs. The 4th tab toggles motion: yellow means on, red means off.
+- To change the `/3ds` prefix, edit `prefix=` in the config file. This helps when you run several 3DSes.
+
+## eucseq: 3D Euclidean sequencer
+
+This is a second app, in `sequencer/`. Build it with `make -C sequencer`, preview it with `make -C sequencer run`, or send it to the 3DS with `make -C sequencer send`.
+
+The ring is **one bar (4 beats)**. A white 5-point star sweeps around it. Five **tracks** each subdivide the ring independently, which gives polyrhythms such as 3 against 4 against 5. Each track has its own shape, colour and lane inside the ring:
+
+| Track | Shape | Colour | OSC |
+|---|---|---|---|
+| 1 | cube | red | `/shape_1/pulse <obj>` |
+| 2 | sphere | yellow | `/shape_2/pulse <obj>` |
+| 3 | pyramid | blue | `/shape_3/pulse <obj>` |
+| 4 | diamond | green | `/shape_4/pulse <obj>` |
+| 5 | cylinder | magenta | `/shape_5/pulse <obj>` |
+
+`<obj>` is an int giving the object's position on the track (1…DIVS, clockwise from the top). Pulses are timed on a 1 ms thread, not the 60 fps frame loop.
+
+Each track has these settings:
+- **DIVS** (0–32): how many equal subdivisions of the ring the track has. Adding divisions adds more of that shape.
+- **PULSES**: how many of those subdivisions get a shape, spread out Euclidean-style. Empty subdivisions show as tiny dim ticks. PULSES follows DIVS until you lower it.
+- **ROTATE** (0–359°): slides that track's shapes around the ring by that many degrees. They fire when the star reaches their new position, so this also shifts their timing. Hold ± to speed up, or hold ZR with the D-pad for ±10°.
+- **Mute**: dims the shape and stops its OSC.
+
+**Bottom screen:** the header has EXPAND on the left and the target address with a SET IP button on the right. Below it is a tile per track. Tap a tile to select that track, and tap its lower **mute** strip to mute it. Below that are DIVS / PULSES / ROTATE for the selected track, then PLAY and BPM (20–300). The right end of the bottom bar is free for upcoming page buttons.
+
+| Control | Action |
+|---|---|
+| A / PLAY button | play / stop |
+| B | rewind to the top of the bar |
+| L / R | previous / next track |
+| X | mute / unmute selected track |
+| ZL / EXPAND button | toggle expand: objects sit on the ring line by default; expand slides each track into its own lane |
+| D-pad ↑↓ | select row (DIVS, PULSES, ROTATE, BPM) |
+| D-pad ←→ | change value (hold ZR for ±10) |
+| Circle pad | orbit the 3D view (Y resets it) |
+| 3D slider | depth |
+| SELECT | set target IP / port (shared with osc3ds) |
+| START | quit |
+
+### SYNTH page
+
+Use the **<** and **>** buttons at the right of the bottom bar to switch pages.
+
+- **Carousel** (top row): **OSC**, **NOISE** and **ENV**. Tap a class to add it to the canvas, or drag it to place it.
+  - **OSC**: WAVE (SINE, TRI, SAW, SQR, CUST), FREQ (20–4000 Hz), PW (pulse width for SQR), MOD and LEVEL. Choosing **CUST** shows a 16-point waveform you draw with the stylus. The OSC input bends pitch by MOD octaves, so patch an ENV into it for kick drums and zaps.
+  - **NOISE**: TYPE (WHITE, PINK, BROWN) and LEVEL.
+  - **ENV**: ATTACK, DECAY, SUSTAIN, RELEASE, LENGTH and LEVEL. It shapes the volume of whatever is patched into it. With nothing plugged in, it outputs the envelope shape itself, which is useful for modulating an OSC.
+- **Toolbar:**
+  - **BOX / PAN** sets what dragging on empty canvas does: box-select or pan.
+  - **−** / **%** / **+** zoom. Tap the percentage to fit everything on screen.
+  - **COPY**, **PASTE** and **DEL** act on the selected nodes. Paste keeps the links between the copied nodes, offsets each paste a little, and leaves the pasted outputs off.
+- **Canvas:**
+  - Drag a node to move it. Dragging a selected node moves the whole selection.
+  - To patch, drag from a node's right **output** square to another node's left **input** square. Drag a cable off an input to unplug it.
+  - **L / R** zoom and the **D-pad** pans.
+- **Tap a node** to open its settings:
+  - Sliders and choices for that class.
+  - **OUTPUT** (OFF by default): pick any combination of shapes 1–5. Only output nodes are heard, and envelopes feeding an output are triggered by those shapes' pulses. Output nodes show small coloured squares on the canvas.
+  - **DELETE** / **CLOSE**.
+- **Starter patch:** white noise into an envelope, output on the cube.
+
+**Audio needs the DSP firmware file** at `sdmc:/3ds/dspfirm.cdc`. Create it on your 3DS with the DSP1 homebrew. Without it, the SYNTH page shows "NO AUDIO" but everything else still works. For Azahar, copy that file into `~/Library/Application Support/Azahar/sdmc/3ds/`.
+
+The UI font is Arial, converted from macOS's `Arial.ttf` into `sequencer/romfs/arial.bcfnt` at build time.
+
+## Layout
+
+```
+source/main.c        osc3ds app: input, touch surface, drawing, networking, settings
+sequencer/source/    eucseq: main.c (sequencer + 3D), synth.c (audio engine), page_synth.c (patcher UI)
+common/osc.c/.h      portable OSC encoder
+common/netcfg.c/.h   shared config file, UDP socket, IP/port keyboard
+tools/osc_monitor.py desktop receiver for debugging
+tools/test_osc.c     host-side encoder test
+```
