@@ -6,7 +6,7 @@ Everything in this repo was written in one conversation with an AI coding agent.
 |---|---|
 | **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
 | **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
-| **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 00:50 (US Eastern), about 23 hours of calendar time, most of it the author away or testing |
+| **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 11:30 (US Eastern), about 34 hours of calendar time, most of it the author away or testing |
 | **Claude's working time** | **about 1 hour 10 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
 | **Prompts** | 24 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
 
@@ -48,8 +48,8 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | – | 00:25 | – | *(question box: what the gyro toggle should do)* → **Send gyro over OSC** |
 | 27 | 00:33 | 1.0 min | gyro and accel are always zero but the basic osc on and off functionality works |
 | 28 | 00:38 | ~9 min | gyro works but let me activate accel and gyro separately, no need to display values in the settings panel, create 3 new buttons  in the top empty bar between expand and the settings icon: save, load, and song (strings sequences  together) |
-| 29 | 00:50 | 0.1 min | Works |
-| 30 | 00:52 | ~1 min | *(button)* Publish v0.2.0 |
+| 29 | 11:25 | 0.1 min | Works |
+| 30 | 11:25 | ~2 min | *(button)* Publish v0.2.0 |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
