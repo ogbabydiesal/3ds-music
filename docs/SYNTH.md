@@ -17,7 +17,7 @@ From top to bottom:
 | **Header** | Page name; **SAVE / LOAD / SONG**, where slots store the pattern and this synth patch; and the **settings gear**: OSC output on/off, target IP/port, gyro and accel over OSC. The gear is green while OSC is on. |
 | **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. **<** / **>** scroll the carousel once there are more classes. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
-| **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. |
+| **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. Each node shows its number (e.g. "OSC 4"), which is how the **STEPS** page picks targets. |
 | **Bottom bar** | PLAY/STOP, BPM, and the **< >** page arrows. These are the same on every page. |
 
 The starter patch is **NOISE (white) → ENV**, with the ENV output on shape 1 (the red cube). Press PLAY and you hear a short noise tick on every cube pulse, like a closed hi-hat.
@@ -114,6 +114,10 @@ Here the kick chain was copied and pasted, dragged below the original, retuned t
 
 - **Zoom:** **−** / **+** in the toolbar, or **L** / **R**, from 40% to 250%. Tap the **%** to fit all nodes.
 - **Pan:** switch the toolbar to **PAN** and drag on empty canvas, or hold the **D-pad**.
+
+## Stepping parameters
+
+Any node setting can be stepped per pulse from the **STEPS** page, the third page: pick a node by its number, a parameter, a MIN/MAX range, and draw the values. See the README's STEPS section.
 
 ## Sound output
 

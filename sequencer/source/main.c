@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "netcfg.h"
+#include "modseq.h"
 #include "page_synth.h"
 #include "pattern.h"
 #include "settings.h"
@@ -113,6 +114,7 @@ static void seq_set_playing(bool p) {
     LightLock_Lock(&seq_lock);
     if (p && !seq.playing) {
         seq.pos = -1e-9;                    // so position 0 fires immediately
+        mod_reset();                        // STEPS lanes restart at step 1
         seq.last_tick = svcGetSystemTick();
         Pattern sp;
         if (song_on_play(&sp)) apply_pattern_locked(&sp);   // SONG mode: start at step 1
@@ -162,7 +164,8 @@ static void seq_thread(void *arg) {
             char addr[32];
             snprintf(addr, sizeof addr, "/shape_%d/pulse", fire[i].track);
             if (settings_osc_on()) net_send(addr, "i", (int)fire[i].obj);   // OSC off by default
-            syn_trigger(fire[i].track - 1);   // play any instrument assigned to this shape
+            mod_on_pulse(fire[i].track - 1);  // STEPS lanes set their parameters first...
+            syn_trigger(fire[i].track - 1);   // ...then play any instrument assigned to this shape
         }
         svcSleepThread(1000000LL);  // 1 ms
     }
@@ -410,8 +413,8 @@ static int sel_row = ROW_DIVS;
 #define PAGE_NEXT_X  271
 #define PAGE_BTN_W   45
 
-enum { PAGE_SEQ, PAGE_SYNTH, NPAGES };
-static const char *page_names[NPAGES] = { "SEQUENCER", "SYNTH" };
+enum { PAGE_SEQ, PAGE_SYNTH, PAGE_MOD, NPAGES };
+static const char *page_names[NPAGES] = { "SEQUENCER", "SYNTH", "STEPS" };
 static int page = PAGE_SEQ;
 
 // Hit-test ids
@@ -526,6 +529,7 @@ static void draw_bottom(const Seq *s, int pressed) {
     draw_gear((HDR_IP_BTN_X + BOT_W - 4) / 2.0f, 11.5f, settings_osc_on() ? accent : fg, pressed == BTN_NET ? accent : btn);
 
     if (page == PAGE_SEQ) draw_seq_page(s, pressed);
+    else if (page == PAGE_MOD) mod_page_draw();
 
     // Bottom bar: play | bpm - value + | < page >
     draw_button(4, BAR_Y, 74, BAR_H, s->playing ? C2D_Color32(190, 60, 60, 255) : accent, fg,
@@ -605,6 +609,7 @@ int main(void) {
     store_init();                                     // save slots + song
 
     syn_init();
+    mod_init();
     syn_audio_start();                                // needs sdmc:/3ds/dspfirm.cdc
     LightLock_Init(&seq_lock);
     for (int t = 0; t < NTRACKS; t++) track_rebuild(&seq.tr[t]);
@@ -616,7 +621,7 @@ int main(void) {
     hidSetRepeatParameters(20, 4);
     int touch_btn = BTN_NONE, touch_hold = 0;
     touchPosition last_tp = { 0, 0 };
-    bool touch_owner_synth = false;
+    bool touch_owner_synth = false, touch_owner_mod = false;
     u64 t0 = svcGetSystemTick();
 
     while (aptMainLoop()) {
@@ -663,10 +668,15 @@ int main(void) {
             touch_owner_synth = false;
             touch_btn = BTN_NONE;
         } else {
-        if (tdown)
+        if (tdown) {
             touch_owner_synth = page == PAGE_SYNTH &&
                 (synth_page_popup_open() || (last_tp.py >= SYNTH_AREA_Y0 && last_tp.py < SYNTH_AREA_Y1));
-        if (touch_owner_synth) {
+            touch_owner_mod = page == PAGE_MOD && last_tp.py >= MOD_AREA_Y0 && last_tp.py < MOD_AREA_Y1;
+        }
+        if (touch_owner_mod) {
+            if (theld || tup) mod_page_touch(tdown, theld, tup, last_tp.px, last_tp.py);
+            touch_btn = BTN_NONE;
+        } else if (touch_owner_synth) {
             if (theld || tup) synth_page_touch(tdown, theld, tup, last_tp.px, last_tp.py);
             touch_btn = BTN_NONE;
         } else

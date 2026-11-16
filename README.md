@@ -154,7 +154,7 @@ The OSC, gyro and accel choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3
 |---|---|
 | ![Save slots](docs/screenshots/store-1-save.png) | ![Song editor](docs/screenshots/store-2-song.png) |
 
-- **SAVE:** tap a slot to store the current **pattern** (BPM plus all five tracks' DIVS, PULSES, ROTATE and mute) and the **synth patch**. Saving over a used slot replaces it without asking. Each tile shows the BPM and a coloured square for each active track; a dark square means that track is muted.
+- **SAVE:** tap a slot to store the current **pattern** (BPM plus all five tracks' DIVS, PULSES, ROTATE and mute), the **synth patch** and the **STEPS lanes**. Saving over a used slot replaces it without asking. Each tile shows the BPM and a coloured square for each active track; a dark square means that track is muted.
 - **LOAD:** tap a used slot to restore its pattern and synth patch.
 - **SONG:** strings slots together. Each step is "slot × bars", up to 16 steps, and the chain loops.
   - Tap **+** to add a step, which copies the selected one. Tap a step to select it, then change its **SLOT** and **BARS**. **DEL STEP** removes it.
@@ -164,11 +164,24 @@ The OSC, gyro and accel choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3
   - A step pointing at an empty slot shows its number in red and keeps the current pattern.
 - Files are stored in `sdmc:/3ds/osc3ds/eucseq/` (`slot1.txt` … `slot8.txt`, `song.txt`). They're plain text.
 
+### STEPS page (parameter step sequencer)
+
+![STEPS page](docs/screenshots/steps-1-lane.png)
+
+The third page, after SEQUENCER and SYNTH (use **< >**), holds four step-sequencer **lanes**, **A–D**. Each lane is a row of sliders that steps a synth parameter:
+- **TRIG:** which shape's pulses advance the lane. Every pulse moves to the next slider and sets the parameter just before that pulse's note plays. After the last slider it loops to the first. PLAY restarts every lane at step 1.
+- **TARGET:** pick a synth node with **< >** (nodes are numbered on the SYNTH canvas, e.g. "OSC 4"), then one of its parameters with the second **< >**. That includes FREQ, PW, MOD, LEVEL, every ADSR value, noise TYPE and the OSC WAVE. New node types such as filters will show up here automatically.
+- **MIN / MAX:** drag to set the range. It's shown in the parameter's units, and MIN can be above MAX to invert.
+- **STEPS:** 1–16 sliders.
+- **Sliders:** drag across them to draw values. The playing step is outlined, and the readout shows the value of the step you touched.
+- Lanes with a target show a small coloured dot on their tab. Exponential parameters (FREQ, times) scale musically: halfway between 110 and 440 Hz is 220 Hz.
+- Lanes are saved in slots along with the synth patch.
+
 ### SYNTH page
 
 **Full guide with screenshots: [docs/SYNTH.md](docs/SYNTH.md).**
 
-Use the **<** and **>** buttons at the right of the bottom bar to switch pages.
+Use the **<** and **>** buttons at the right of the bottom bar to switch pages: SEQUENCER → SYNTH → STEPS.
 
 - **Carousel** (top row): **OSC**, **NOISE** and **ENV**. Tap a class to add it to the canvas, or drag it to place it.
   - **OSC**: WAVE (SINE, TRI, SAW, SQR, CUST), FREQ (20–4000 Hz), PW (pulse width for SQR), MOD and LEVEL. Choosing **CUST** shows a 16-point waveform you draw with the stylus. The OSC input bends pitch by MOD octaves, so patch an ENV into it for kick drums and zaps.

@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "modseq.h"
 #include "netcfg.h"
 #include "page_synth.h"
 #include "settings.h"
@@ -139,8 +140,10 @@ static void draw_button(float x, float y, float w, float h, u32 fill, const char
     text(x + w / 2, y + (h - 30 * sc) / 2, sc, COL_FG, C2D_AlignCenter, "%s", label);
 }
 
+static int scene_page = 1;                   // 1 = SYNTH, 2 = STEPS
+
 static void draw_chrome(bool playing) {
-    text(6, 4, 0.48f, COL_FG, 0, "SYNTH");
+    text(6, 4, 0.48f, COL_FG, 0, scene_page == 2 ? "STEPS" : "SYNTH");
     C2D_DrawRectSolid(288, 2, 0.5f, 28, 19, COL_BTN);                 // settings gear
     draw_gear(302, 11.5f, settings_osc_on() ? COL_ACCENT : COL_FG, COL_BTN);
     draw_button(96, 2, 58, 19, COL_BTN, "SAVE", 0.42f);
@@ -156,8 +159,8 @@ static void draw_chrome(bool playing) {
     text(151, by + 19, 0.34f, COL_DIM, C2D_AlignCenter, "BPM");
     draw_button(224, by, 45, bh, COL_BTN, "<", 0.6f);
     draw_button(271, by, 45, bh, COL_BTN, ">", 0.6f);
-    for (int i = 0; i < 2; i++)
-        C2D_DrawRectSolid(268 - 6 + i * 6 + 2, by + bh - 5, 0.5f, 3, 3, i == 1 ? COL_FG : COL_LINE);
+    for (int i = 0; i < 3; i++)
+        C2D_DrawRectSolid(268 - 9 + i * 6 + 2, by + bh - 5, 0.5f, 3, 3, i == scene_page ? COL_FG : COL_LINE);
 }
 
 // ------------------------------------------------------------ rendering ---
@@ -171,7 +174,7 @@ static void render(const char *path, bool playing) {
     CGContextSetShouldAntialias(ctx, true);
 
     C2D_DrawRectSolid(0, 0, 0.5f, BOT_W, 240, COL_BG_BOT);
-    synth_page_draw();
+    if (scene_page == 2) mod_page_draw(); else synth_page_draw();
     draw_chrome(playing);
     synth_page_draw_popup();
     settings_draw();
@@ -213,7 +216,8 @@ int main(int argc, char **argv) {
 #define OUT(name) (snprintf(p, sizeof p, "%s/%s", out, name), p)
 
     store_init();
-    syn_init();                                  // starter: NOISE(0) -> ENV(1), ENV out on shape 1
+    syn_init();
+    mod_init();                                  // starter: NOISE(0) -> ENV(1), ENV out on shape 1
     render(OUT("synth-1-starter.png"), false);
 
     // ENV settings popup
@@ -300,6 +304,23 @@ int main(int argc, char **argv) {
     for (int b = 0; b < 5; b++) song_on_bar(&sp);                             // now on step 2
     store_ui_touch_down(10 + 10 + 1 * 36 + 5, sgy + 32 + 5);                  // select step 2
     render(OUT("store-2-song.png"), true);
+    store_ui_close();
+
+    // STEPS page: lane A plays a melody on the kick OSC's FREQ (sphere pulses),
+    // lane B steps the hi-hat ENV decay (cube pulses)
+    scene_page = 2;
+    ModLane *A = &mod_lanes[0], *B = &mod_lanes[1];
+    const ParamDef *fd = &syn_classes[NODE_OSC].params[OSC_FREQ];
+    B->node = 1; B->param = ENV_D; B->trig = 0; B->nsteps = 4;
+    A->node = os; A->param = OSC_FREQ; A->trig = 1; A->nsteps = 8;
+    A->min_u = syn_param_to_norm(fd, 55); A->max_u = syn_param_to_norm(fd, 220);
+    const float mel[8] = { 0, .5f, .25f, .75f, 0, 1, .5f, .38f };
+    for (int i = 0; i < 8; i++) A->v[i] = mel[i];
+    mod_reset();
+    for (int i = 0; i < 3; i++) mod_on_pulse(1);  // now playing step 3
+    mod_page_touch(true, true, false, 4 + 5 * 39 + 10, 150);   // touch slider 6 (sets it + readout)
+    mod_page_touch(false, false, true, 4 + 5 * 39 + 10, 150);
+    render(OUT("steps-1-lane.png"), true);
     store_ui_close();
     return 0;
 }

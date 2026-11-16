@@ -1,4 +1,5 @@
 #include "store.h"
+#include "modseq.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -50,12 +51,18 @@ static bool write_slot(int slot, const Pattern *p, const SynNode *nodes) {
         for (int k = 0; k < SYN_WT_SIZE; k++) fprintf(f, " %g", n->wt[k]);
         fputc('\n', f);
     }
+    for (int l = 0; l < MOD_LANES; l++) {
+        const ModLane *L = &mod_lanes[l];
+        fprintf(f, "mod %d %d %d %d %d %g %g", l, L->node, L->param, L->trig, L->nsteps, L->min_u, L->max_u);
+        for (int k = 0; k < MOD_MAX_STEPS; k++) fprintf(f, " %g", L->v[k]);
+        fputc('\n', f);
+    }
     fclose(f);
     return true;
 }
 
-// nodes may be NULL (pattern only)
-static bool read_slot(int slot, Pattern *p, SynNode *nodes) {
+// nodes / lanes may be NULL (pattern only)
+static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModLane *lanes) {
     char path[256];
     slot_path(slot, path, sizeof path);
     FILE *f = fopen(path, "r");
@@ -63,6 +70,7 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes) {
     memset(p, 0, sizeof *p);
     p->bpm = 120;
     if (nodes) memset(nodes, 0, sizeof(SynNode) * SYN_MAX_NODES);
+    if (lanes) mod_defaults(lanes);                    // older saves have no lanes: start clean
     char line[1024];
     bool ok = false;
     while (fgets(line, sizeof line, f)) {
@@ -74,6 +82,17 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes) {
             p->tr[a].pulses = c < 0 ? 0 : c > p->tr[a].divs ? p->tr[a].divs : c;
             p->tr[a].rot = ((d % 360) + 360) % 360;
             p->tr[a].mute = e != 0;
+        } else if (lanes && !strncmp(line, "mod ", 4)) {
+            char *tok = strtok(line + 4, " \n");
+            float v[7 + MOD_MAX_STEPS];
+            int nv = 0;
+            while (tok && nv < (int)(sizeof v / sizeof v[0])) { v[nv++] = strtof(tok, NULL); tok = strtok(NULL, " \n"); }
+            int l = nv ? (int)v[0] : -1;
+            if (nv < 7 || l < 0 || l >= MOD_LANES) continue;
+            ModLane *L = &lanes[l];
+            L->node = (int)v[1]; L->param = (int)v[2]; L->trig = (int)v[3]; L->nsteps = (int)v[4];
+            L->min_u = v[5]; L->max_u = v[6];
+            for (int k = 0; k < MOD_MAX_STEPS && 7 + k < nv; k++) L->v[k] = v[7 + k];
         } else if (nodes && !strncmp(line, "node ", 5)) {
             char *tok = strtok(line + 5, " \n");
             float v[6 + SYN_MAX_PARAMS + SYN_WT_SIZE];
@@ -111,10 +130,12 @@ bool store_save_slot(int slot) {
 
 bool store_load_slot(int slot) {
     static SynNode nodes[SYN_MAX_NODES];
+    static ModLane lanes[MOD_LANES];
     Pattern p;
-    if (!read_slot(slot, &p, nodes)) return false;
+    if (!read_slot(slot, &p, nodes, lanes)) return false;
     seq_set_pattern(&p);
     syn_replace_all(nodes);
+    mod_set_all(lanes);
     return true;
 }
 
@@ -191,7 +212,7 @@ void store_init(void) {
     LightLock_Init(&song_lock);
 #endif
     make_dirs();
-    for (int s = 0; s < STORE_NSLOTS; s++) cache_ok[s] = read_slot(s, &cache[s], NULL);
+    for (int s = 0; s < STORE_NSLOTS; s++) cache_ok[s] = read_slot(s, &cache[s], NULL, NULL);
     song_load();
 }
 
@@ -258,7 +279,7 @@ static void draw_slots(bool saving) {
         }
     }
     if (msg[0]) text(SL_X + 10, SL_BTN_Y + 6, 0.38f, COL_ACCENT, 0, "%s", msg);
-    else text(SL_X + 10, SL_BTN_Y + 6, 0.32f, COL_DIM, 0, "slots hold the pattern + synth patch");
+    else text(SL_X + 10, SL_BTN_Y + 6, 0.32f, COL_DIM, 0, "slots hold the pattern, synth patch + STEPS");
     button(SL_X + SL_W - 10 - 84, SL_BTN_Y, 84, 24, COL_BTN, "CLOSE");
 }
 

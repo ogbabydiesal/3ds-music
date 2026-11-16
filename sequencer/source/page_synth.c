@@ -298,7 +298,7 @@ void synth_page_draw_popup(void) {
     C2D_DrawRectSolid(POP_X, py, 0.5f, POP_W, ph, COL_PANEL);
     rect_outline(POP_X, py, POP_W, ph, COL_LINE);
 
-    text(POP_X + 8, py + 5, 0.5f, COL_FG, 0, "%s", c->name);
+    text(POP_X + 8, py + 5, 0.5f, COL_FG, 0, "%s %d", c->name, node + 1);
     if (c->has_input) text(POP_X + POP_W - 8, py + 7, 0.36f, COL_DIM, C2D_AlignRight, "input: %s", c->input_name);
 
     for (int k = 0; k < c->nparams; k++) {
@@ -539,7 +539,7 @@ static void draw_canvas(void) {
                 C2D_DrawRectSolid(x + w - (tag + 1) * (ts + 2) - 1, y + 3, 0.5f, ts, ts, track_color(t, 0, false));
                 tag++;
             }
-        text(x + 5 * zoom, y + 2 * zoom, 0.42f * zoom, COL_FG, 0, "%s", c->name);
+        text(x + 5 * zoom, y + 2 * zoom, 0.42f * zoom, COL_FG, 0, "%s %d", c->name, i + 1);   // number = STEPS target id
         if (zoom >= 0.6f) {
             char sub[24];
             node_subtitle(n, sub, sizeof sub);
