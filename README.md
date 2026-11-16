@@ -7,6 +7,16 @@ Homebrew music tools for the Nintendo 3DS, written in C with [libctru](https://g
 
 Both apps work with any OSC host, such as Max/MSP, Ableton (via Max/Connection Kit), TouchDesigner, Pure Data, Resolume, VCV Rack, SuperCollider, Bitwig or Reaper.
 
+## Download
+
+Ready-to-run builds are on the [**Releases**](https://github.com/ogbabydiesal/3ds-music/releases) page:
+- `osc3ds.3dsx`
+- `eucseq.3dsx`. This build uses the 3DS system font, because Arial can't be redistributed. If you build it yourself on a Mac, you get Arial.
+
+To install, copy the `.3dsx` files to `/3ds/` on your SD card and launch them from the Homebrew Launcher. You need a 3DS with custom firmware. eucseq's sound also needs `sdmc:/3ds/dspfirm.cdc`, which you create with the DSP1 homebrew.
+
+To make release builds yourself, run `make release`. It writes both files to `dist/`.
+
 ## Screenshots
 
 These are from the Azahar emulator on earlier builds. The current build differs in several ways:

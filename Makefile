@@ -78,10 +78,21 @@ endif
 
 export _3DSXFLAGS += --smdh=$(CURDIR)/$(TARGET).smdh
 
-.PHONY: all clean run send
+.PHONY: all clean run send release
+
 
 all: $(BUILD)
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+
+# Public builds for GitHub Releases -> dist/
+# eucseq is built WITHOUT the Arial romfs font (Arial can't be redistributed),
+# so the release uses the 3DS system font. Your normal `make` keeps Arial.
+release:
+	rm -rf dist && mkdir -p dist
+	$(MAKE) clean && $(MAKE) all && cp $(TARGET).3dsx dist/
+	$(MAKE) -C sequencer clean && $(MAKE) -C sequencer all ROMFS= FONT_OUT= && cp sequencer/eucseq.3dsx dist/
+	$(MAKE) -C sequencer clean && $(MAKE) -C sequencer all
+	@ls -l dist
 
 # Preview in the Azahar emulator. Override with: make run AZAHAR=/path/to/Azahar.app
 AZAHAR ?= $(firstword $(wildcard /Applications/Azahar.app $(HOME)/Applications/Azahar.app $(HOME)/Downloads/azahar-*/Azahar.app))

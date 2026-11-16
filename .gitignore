@@ -9,3 +9,4 @@ build/
 sequencer/romfs/arial.bcfnt
 
 .DS_Store
+dist/
