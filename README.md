@@ -118,7 +118,7 @@ Each track has these settings:
 - **ROTATE** (0–359°): slides that track's shapes around the ring by that many degrees. They fire when the star reaches their new position, so this also shifts their timing. Hold ± to speed up, or hold ZR with the D-pad for ±10°.
 - **Mute**: dims the shape and stops its OSC.
 
-**Bottom screen:** the header has EXPAND on the left and a **settings gear** on the right. The gear is green while OSC output is on. Below it is a tile per track. Tap a tile to select that track, and tap its lower **mute** strip to mute it. Below that are DIVS / PULSES / ROTATE for the selected track, then PLAY and BPM (20–300). The right end of the bottom bar has the **< >** page arrows.
+**Bottom screen:** the header has EXPAND on the left, then **SAVE**, **LOAD** and **SONG**, then a **settings gear** on the right. The gear is green while OSC output is on. Below it is a tile per track. Tap a tile to select that track, and tap its lower **mute** strip to mute it. Below that are DIVS / PULSES / ROTATE for the selected track, then PLAY and BPM (20–300). The right end of the bottom bar has the **< >** page arrows.
 
 | Control | Action |
 |---|---|
@@ -142,10 +142,27 @@ Each track has these settings:
 |---|---|---|
 | OSC OUTPUT | **OFF** | Sends `/shape_N/pulse` messages. Sound on the SYNTH page plays either way. |
 | TARGET IP / PORT | from config | Tap to type with the system keyboard. Shared with osc3ds through `sdmc:/3ds/osc3ds/config.ini`. |
-| GYRO OSC | OFF | Sends `/gyro x y z` (angular rate) and `/accel x y z` (≈1.0 = 1 g) about 30 times a second. Only while OSC OUTPUT is on. The row also shows live sensor readings, so you can check the sensors on the 3DS. |
+| GYRO | OFF | Sends `/gyro x y z` (angular rate) about 30 times a second, while OSC OUTPUT is on. |
+| ACCEL | OFF | Sends `/accel x y z` (≈1.0 = 1 g) about 30 times a second, while OSC OUTPUT is on. |
 | THIS 3DS | – | This 3DS's IP address, for reference. |
 
-The OSC and gyro choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3ds is unaffected: it always sends.
+The OSC, gyro and accel choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3ds is unaffected: it always sends.
+
+### Save, load and song
+
+| SAVE (8 slots) | SONG chain |
+|---|---|
+| ![Save slots](docs/screenshots/store-1-save.png) | ![Song editor](docs/screenshots/store-2-song.png) |
+
+- **SAVE:** tap a slot to store the current **pattern** (BPM plus all five tracks' DIVS, PULSES, ROTATE and mute) and the **synth patch**. Saving over a used slot replaces it without asking. Each tile shows the BPM and a coloured square for each active track; a dark square means that track is muted.
+- **LOAD:** tap a used slot to restore its pattern and synth patch.
+- **SONG:** strings slots together. Each step is "slot × bars", up to 16 steps, and the chain loops.
+  - Tap **+** to add a step, which copies the selected one. Tap a step to select it, then change its **SLOT** and **BARS**. **DEL STEP** removes it.
+  - Turn **song mode ON** and press PLAY. Playback starts at step 1 and switches the sequencer pattern and BPM at bar lines.
+  - **The synth patch you have loaded keeps playing** through the song, so instruments don't cut off mid-note. Load a slot first if you want its patch.
+  - The playing step is highlighted, and the top screen shows `SONG step/steps  bar n/N`. The **SONG** button stays lit while song mode is on.
+  - A step pointing at an empty slot shows its number in red and keeps the current pattern.
+- Files are stored in `sdmc:/3ds/osc3ds/eucseq/` (`slot1.txt` … `slot8.txt`, `song.txt`). They're plain text.
 
 ### SYNTH page
 

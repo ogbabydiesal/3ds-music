@@ -186,6 +186,35 @@ void syn_clear_outputs(int node) {
     GRAPH_UNLOCK();
 }
 
+void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
+    GRAPH_LOCK();
+    for (int i = 0; i < SYN_MAX_NODES; i++) {
+        SynNode *n = &syn_nodes[i];
+        memset(n, 0, sizeof *n);
+        if (!src[i].used || src[i].type < 0 || src[i].type >= NODE_CLASS_COUNT) continue;
+        n->used = true;
+        n->type = src[i].type;
+        n->x = src[i].x; n->y = src[i].y;
+        memcpy(n->p, src[i].p, sizeof n->p);
+        memcpy(n->wt, src[i].wt, sizeof n->wt);
+        n->input = src[i].input;
+        n->outputs = src[i].outputs & 0x1F;
+        n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
+    }
+    for (int i = 0; i < SYN_MAX_NODES; i++) {          // drop links to missing nodes / loops
+        SynNode *n = &syn_nodes[i];
+        if (!n->used || n->input < 0) continue;
+        if (n->input >= SYN_MAX_NODES || !syn_nodes[n->input].used || !syn_classes[n->type].has_input) n->input = -1;
+    }
+    for (int i = 0; i < SYN_MAX_NODES; i++) {
+        int steps = 0;
+        for (int j = syn_nodes[i].input; j >= 0 && steps <= SYN_MAX_NODES; j = syn_nodes[j].input) steps++;
+        if (steps > SYN_MAX_NODES) syn_nodes[i].input = -1;
+    }
+    rebuild();
+    GRAPH_UNLOCK();
+}
+
 void syn_init(void) {
 #ifdef __3DS__
     LightLock_Init(&graph_lock);

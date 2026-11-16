@@ -8,9 +8,9 @@ $(OUT)/synth-1-starter.png: $(BIN)
 	@mkdir -p $(OUT)
 	./$(BIN) $(OUT)
 
-$(BIN): render.c $(SRC)/page_synth.c $(SRC)/synth.c $(SRC)/settings.c $(SRC)/*.h shim/*.h
+$(BIN): render.c $(SRC)/page_synth.c $(SRC)/synth.c $(SRC)/settings.c $(SRC)/store.c $(SRC)/*.h shim/*.h
 	@mkdir -p build
-	cc -O2 -w -DSYN_HOST_AUDIO_OK=1 -Ishim -I$(SRC) -I../../common render.c $(SRC)/page_synth.c $(SRC)/synth.c $(SRC)/settings.c \
+	cc -O2 -w -DSYN_HOST_AUDIO_OK=1 -Ishim -I$(SRC) -I../../common render.c $(SRC)/page_synth.c $(SRC)/synth.c $(SRC)/settings.c $(SRC)/store.c -DSTORE_DIR=\"store\" \
 	   -framework CoreGraphics -framework CoreText -framework ImageIO -framework CoreFoundation -lm -o $@
 
 clean:

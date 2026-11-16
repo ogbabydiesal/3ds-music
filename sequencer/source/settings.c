@@ -10,19 +10,21 @@
 
 static bool osc_on = false;         // OSC output is OFF until the user turns it on
 static bool gyro_on = false;
+static bool accel_on = false;
 static bool open_ = false;
 static unsigned frame = 0;
 
 bool settings_osc_on(void)  { return osc_on; }
 bool settings_gyro_on(void) { return gyro_on; }
+bool settings_accel_on(void) { return accel_on; }
 bool settings_is_open(void) { return open_; }
 void settings_open(void)    { open_ = true; }
 void settings_close(void)   { open_ = false; }
 
 // The HID service counts enable/disable requests, so calling Disable before
 // any Enable leaves the sensors off even after a later Enable. Turn them on
-// exactly once at startup and off once at exit; the GYRO toggle only decides
-// whether readings are sent.
+// exactly once at startup and off once at exit; the GYRO / ACCEL toggles only
+// decide whether readings are sent.
 static bool sensors_on = false;
 
 static void sensors_start(void) {
@@ -44,7 +46,7 @@ static void save(void) {
     mkdir("sdmc:/3ds/osc3ds", 0777);
     FILE *f = fopen(SETTINGS_PATH, "w");
     if (!f) return;
-    fprintf(f, "# eucseq settings\nosc=%d\ngyro=%d\n", osc_on, gyro_on);
+    fprintf(f, "# eucseq settings\nosc=%d\ngyro=%d\naccel=%d\n", osc_on, gyro_on, accel_on);
     fclose(f);
 }
 
@@ -56,22 +58,27 @@ void settings_load(void) {
         while (fgets(line, sizeof line, f)) {
             if (sscanf(line, "osc=%d", &v) == 1) osc_on = v != 0;
             else if (sscanf(line, "gyro=%d", &v) == 1) gyro_on = v != 0;
+            else if (sscanf(line, "accel=%d", &v) == 1) accel_on = v != 0;
         }
         fclose(f);
     }
     sensors_start();
 }
 
-// ~30 Hz motion over OSC, only while both OSC output and gyro are on.
+// ~30 Hz motion over OSC; gyro and accel each have their own switch.
 void settings_tick(void) {
     frame++;
-    if (!osc_on || !gyro_on || (frame & 1)) return;
-    accelVector a;
-    angularRate g;
-    hidAccelRead(&a);
-    hidGyroRead(&g);
-    net_send("/gyro", "fff", g.x / 100.0, g.y / 100.0, g.z / 100.0);
-    net_send("/accel", "fff", a.x / 512.0, a.y / 512.0, a.z / 512.0);   // ~1.0 = 1 g
+    if (!osc_on || (frame & 1)) return;
+    if (gyro_on) {
+        angularRate g;
+        hidGyroRead(&g);
+        net_send("/gyro", "fff", g.x / 100.0, g.y / 100.0, g.z / 100.0);
+    }
+    if (accel_on) {
+        accelVector a;
+        hidAccelRead(&a);
+        net_send("/accel", "fff", a.x / 512.0, a.y / 512.0, a.z / 512.0);   // ~1.0 = 1 g
+    }
 }
 
 // ----------------------------------------------------------------- layout ---
@@ -82,7 +89,7 @@ void settings_tick(void) {
 #define TITLE_H 28
 #define CTRL_X  (SX + 132)
 #define CTRL_W  (SW - 132 - 10)
-enum { ROW_OSC, ROW_IP, ROW_PORT, ROW_GYRO, ROW_LOCAL, NROWS };
+enum { ROW_OSC, ROW_IP, ROW_PORT, ROW_GYRO, ROW_ACCEL, ROW_LOCAL, NROWS };
 
 static float pop_h(void) { return TITLE_H + NROWS * ROW_H + 8 + 24 + 8; }
 static float pop_y(void) { return (240 - pop_h()) / 2; }
@@ -117,28 +124,22 @@ void settings_draw(void) {
 
     char port[8];
     snprintf(port, sizeof port, "%d", net_cfg.port);
-    const char *labels[NROWS] = { "OSC OUTPUT", "TARGET IP", "PORT", "GYRO OSC", "THIS 3DS" };
+    const char *labels[NROWS] = { "OSC OUTPUT", "TARGET IP", "PORT", "GYRO", "ACCEL", "THIS 3DS" };
     for (int r = 0; r < NROWS; r++) {
         float y = row_y(r);
         if (r > 0) C2D_DrawRectSolid(SX + 8, y, 0.5f, SW - 16, 1, C2D_Color32(38, 46, 55, 255));
-        bool dim_row = (r == ROW_GYRO || r == ROW_IP || r == ROW_PORT) && !osc_on;
-        text(SX + 10, y + (r == ROW_GYRO ? 3 : 6), 0.42f, dim_row ? COL_DIM : COL_FG, 0, "%s", labels[r]);
+        bool motion = r == ROW_GYRO || r == ROW_ACCEL;
+        bool dim_row = (motion || r == ROW_IP || r == ROW_PORT) && !osc_on;
+        text(SX + 10, y + (motion ? 2 : 6), 0.42f, dim_row ? COL_DIM : COL_FG, 0, "%s", labels[r]);
+        if (motion)
+            text(SX + 10, y + 15, 0.3f, COL_DIM, 0, !osc_on ? "needs OSC output on"
+                 : r == ROW_GYRO ? "sends /gyro x y z" : "sends /accel x y z");
         switch (r) {
         case ROW_OSC:   toggle_seg(y, osc_on, true); break;
         case ROW_IP:    field(y, net_cfg.host, osc_on); break;
         case ROW_PORT:  field(y, port, osc_on); break;
-        case ROW_GYRO:
-            toggle_seg(y, gyro_on, osc_on);
-            if (!osc_on) text(SX + 10, y + 15, 0.3f, COL_DIM, 0, "needs OSC output on");
-            else {                                   // live readout, to check the sensors
-                accelVector a;
-                angularRate g;
-                hidAccelRead(&a);
-                hidGyroRead(&g);
-                text(SX + 10, y + 15, 0.28f, gyro_on ? COL_ACCENT : COL_DIM, 0, "g %d %d %d  a %.1f %.1f %.1f",
-                     g.x, g.y, g.z, a.x / 512.0, a.y / 512.0, a.z / 512.0);
-            }
-            break;
+        case ROW_GYRO:  toggle_seg(y, gyro_on, osc_on); break;
+        case ROW_ACCEL: toggle_seg(y, accel_on, osc_on); break;
         case ROW_LOCAL: text(CTRL_X + CTRL_W - 2, y + 6, 0.4f, COL_DIM, C2D_AlignRight, "%s", net_local_ip()); break;
         }
     }
@@ -159,7 +160,8 @@ void settings_touch_down(int x, int y) {
         bool right_half = x >= CTRL_X + CTRL_W / 2.0f;
         switch (r) {
         case ROW_OSC:  osc_on = right_half; save(); break;
-        case ROW_GYRO: gyro_on = right_half; save(); break;
+        case ROW_GYRO:  gyro_on = right_half; save(); break;
+        case ROW_ACCEL: accel_on = right_half; save(); break;
         case ROW_IP:   net_edit_host(); break;     // system keyboard
         case ROW_PORT: net_edit_port(); break;
         }

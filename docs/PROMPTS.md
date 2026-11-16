@@ -6,9 +6,9 @@ Everything in this repo was written in one conversation with an AI coding agent.
 |---|---|
 | **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
 | **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
-| **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 00:45 (US Eastern), about 23 hours of calendar time, most of it the author away or testing |
-| **Claude's working time** | **about 1 hour** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
-| **Prompts** | 22 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
+| **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 00:50 (US Eastern), about 23 hours of calendar time, most of it the author away or testing |
+| **Claude's working time** | **about 1 hour 10 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
+| **Prompts** | 23 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
 
 **About the working time:** it's measured from the session transcript timestamps, from each prompt to the end of Claude's reply. It includes thinking, writing code and waiting on tools such as compiles and installs. Reasoning time can't be separated out, because the transcript doesn't record it. The three biggest turns were the first sequencer (~8 min), the synth page (~6.6 min), and oscillators with zoom, box select and copy/paste (~4.7 min).
 
@@ -46,7 +46,8 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 25 | 23:58 | 3.2 min | document the synthesis section with screenshots |
 | 26 | Nov 16 00:24 | ~8 min | disable osc output by default, and in the IP address text in the upper right hand corner of the bottom screen replace with a a settings gear icon, encapsulate the OSC settings there, allow me to turn on and off gyro, settings |
 | – | 00:25 | – | *(question box: what the gyro toggle should do)* → **Send gyro over OSC** |
-| 27 | 00:40 | ~3 min | gyro and accel are always zero but the basic osc on and off functionality works |
+| 27 | 00:33 | 1.0 min | gyro and accel are always zero but the basic osc on and off functionality works |
+| 28 | 00:38 | ~9 min | gyro works but let me activate accel and gyro separately, no need to display values in the settings panel, create 3 new buttons  in the top empty bar between expand and the settings icon: save, load, and song (strings sequences  together) |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -71,3 +72,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
    - Six screenshots rendered by `tools/ui_render`, a macOS harness that compiles the app's real SYNTH-page code against a CoreGraphics/CoreText stand-in for citro2d and scripts the scenes with simulated stylus input. Claude couldn't capture the 3DS screen and had been asked not to control the author's computer.
 8. **Settings gear**: OSC output is now off by default. A gear icon replaces the header IP text and opens a SETTINGS box with OSC on/off, target IP and port, gyro over OSC (`/gyro`, `/accel`), and this 3DS's IP. The choices are saved to `eucseq.ini`. The screenshot renderer now draws the settings box too.
 9. **Gyro fix**: the motion sensors read zero. The likely cause was the app sending a sensor "disable" at startup before any "enable"; the 3DS counts these requests, so a later enable didn't turn the sensors on. The sensors now turn on once at launch and off at exit, and the Settings box shows live readings.
+10. **Save, load, song**: separate GYRO and ACCEL toggles, and the live readout removed. SAVE / LOAD / SONG buttons in the header, with 8 slots on the SD card, each holding the pattern and synth patch. Song mode chains "slot × bars" steps and switches patterns at bar lines. A Mac test of the save/load round trip caught a path-length bug in the file names before it shipped. New screenshots.

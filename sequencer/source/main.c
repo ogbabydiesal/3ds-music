@@ -22,7 +22,9 @@
 
 #include "netcfg.h"
 #include "page_synth.h"
+#include "pattern.h"
 #include "settings.h"
+#include "store.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -79,11 +81,41 @@ static void track_rebuild(Track *t) {
     }
 }
 
+// Caller holds seq_lock.
+static void apply_pattern_locked(const Pattern *p) {
+    seq.bpm = p->bpm;
+    for (int t = 0; t < NTRACKS; t++) {
+        seq.tr[t].divs = p->tr[t].divs;
+        seq.tr[t].pulses = p->tr[t].pulses;
+        seq.tr[t].rot = p->tr[t].rot;
+        seq.tr[t].mute = p->tr[t].mute;
+        track_rebuild(&seq.tr[t]);
+    }
+}
+
+void seq_get_pattern(Pattern *out) {
+    LightLock_Lock(&seq_lock);
+    out->bpm = seq.bpm;
+    for (int t = 0; t < NTRACKS; t++)
+        out->tr[t] = (PatTrack){ seq.tr[t].divs, seq.tr[t].pulses, seq.tr[t].rot, seq.tr[t].mute };
+    LightLock_Unlock(&seq_lock);
+}
+
+void seq_set_pattern(const Pattern *p) {
+    LightLock_Lock(&seq_lock);
+    apply_pattern_locked(p);
+    LightLock_Unlock(&seq_lock);
+}
+
+bool seq_is_playing(void) { return seq.playing; }
+
 static void seq_set_playing(bool p) {
     LightLock_Lock(&seq_lock);
     if (p && !seq.playing) {
         seq.pos = -1e-9;                    // so position 0 fires immediately
         seq.last_tick = svcGetSystemTick();
+        Pattern sp;
+        if (song_on_play(&sp)) apply_pattern_locked(&sp);   // SONG mode: start at step 1
     }
     seq.playing = p;
     LightLock_Unlock(&seq_lock);
@@ -104,6 +136,10 @@ static void seq_thread(void *arg) {
             double dt = (double)(now - seq.last_tick) / SYSCLOCK_ARM11;
             double old = seq.pos;
             seq.pos += dt * seq.bpm / 60.0 / BEATS_PER_CYCLE;
+            if (seq.pos >= 1.0) {                           // bar line: SONG may switch pattern
+                Pattern sp;
+                if (song_on_bar(&sp)) apply_pattern_locked(&sp);
+            }
             for (int t = 0; t < NTRACKS; t++) {
                 Track *tr = &seq.tr[t];
                 if (tr->divs <= 0) continue;
@@ -341,6 +377,11 @@ static void draw_top(const Seq *s, float eye_x, float t, u64 now) {
          track_names[sel_track], T->pulses, T->divs, T->rot, T->mute ? "  MUTED" : "");
     text(TOP_W - 8, 6, 0.5f, s->playing ? C2D_Color32(52, 195, 160, 255) : dim,
          C2D_AlignRight, s->playing ? "PLAYING" : "STOPPED");
+    if (song_mode_on()) {
+        int st, n, bar, bars;
+        song_status(&st, &n, &bar, &bars);
+        text(TOP_W - 8, 22, 0.5f, dim, C2D_AlignRight, "SONG %d/%d  bar %d/%d", st + 1, n, bar, bars);
+    }
 }
 
 // ------------------------------------------------------------ bottom UI ---
@@ -361,6 +402,10 @@ static int sel_row = ROW_DIVS;
 #define BAR_Y     204
 #define BAR_H     32
 #define HDR_IP_BTN_X 288          // settings gear button in the header
+#define HDR_SAVE_X   96           // SAVE / LOAD / SONG buttons in the header
+#define HDR_LOAD_X   158
+#define HDR_SONG_X   220
+#define HDR_BTN_W    58
 #define PAGE_PREV_X  224          // < > page arrows in the bottom bar
 #define PAGE_NEXT_X  271
 #define PAGE_BTN_W   45
@@ -375,6 +420,7 @@ enum {
     // 0..5   : row r minus/plus = r*2 + (0|1)  (rows 0..2)
     BTN_BPM_MINUS = 6, BTN_BPM_PLUS = 7,
     BTN_PLAY = 100, BTN_NET = 101, BTN_EXPAND = 102, BTN_PAGE_PREV = 103, BTN_PAGE_NEXT = 104,
+    BTN_SAVE = 105, BTN_LOAD = 106, BTN_SONG = 107,
     BTN_ROW = 200,          // + row
     BTN_TRACK = 300,        // + track
     BTN_MUTE = 310,         // + track
@@ -386,6 +432,9 @@ static int hit_test(int x, int y) {
     if (y < TRK_Y - 2) {                               // header row
         if (x < 92 && page == PAGE_SEQ) return BTN_EXPAND;
         if (x >= HDR_IP_BTN_X) return BTN_NET;
+        if (x >= HDR_SAVE_X && x < HDR_SAVE_X + HDR_BTN_W) return BTN_SAVE;
+        if (x >= HDR_LOAD_X && x < HDR_LOAD_X + HDR_BTN_W) return BTN_LOAD;
+        if (x >= HDR_SONG_X && x < HDR_SONG_X + HDR_BTN_W + 4) return BTN_SONG;
         return BTN_NONE;
     }
     if (page == PAGE_SEQ && y >= TRK_Y && y < TRK_Y + TRK_H) {
@@ -468,7 +517,10 @@ static void draw_bottom(const Seq *s, int pressed) {
     } else {
         text(6, 4, 0.48f, fg, 0, "%s", page_names[page]);
     }
-    // Target address + SET IP (header, right)
+    // SAVE / LOAD / SONG (header, middle). SONG is lit while song mode is on.
+    draw_button(HDR_SAVE_X, 2, HDR_BTN_W, 19, pressed == BTN_SAVE ? accent : btn, fg, "SAVE", 0.42f);
+    draw_button(HDR_LOAD_X, 2, HDR_BTN_W, 19, pressed == BTN_LOAD ? accent : btn, fg, "LOAD", 0.42f);
+    draw_button(HDR_SONG_X, 2, HDR_BTN_W + 4, 19, song_mode_on() || pressed == BTN_SONG ? accent : btn, fg, "SONG", 0.42f);
     // Settings gear (header, right). Green while OSC output is on.
     C2D_DrawRectSolid(HDR_IP_BTN_X, 2, 0.5f, BOT_W - 4 - HDR_IP_BTN_X, 19, pressed == BTN_NET ? accent : btn);
     draw_gear((HDR_IP_BTN_X + BOT_W - 4) / 2.0f, 11.5f, settings_osc_on() ? accent : fg, pressed == BTN_NET ? accent : btn);
@@ -490,6 +542,7 @@ static void draw_bottom(const Seq *s, int pressed) {
 
     if (page == PAGE_SYNTH) synth_page_draw_popup();
     settings_draw();
+    store_ui_draw();
 }
 
 static void draw_seq_page(const Seq *s, int pressed) {
@@ -548,7 +601,8 @@ int main(void) {
     build_meshes();
     net_config_load();
     bool net_ok = net_init();
-    settings_load();                                  // OSC output + gyro toggles
+    settings_load();                                  // OSC output + gyro/accel toggles
+    store_init();                                     // save slots + song
 
     syn_init();
     syn_audio_start();                                // needs sdmc:/3ds/dspfirm.cdc
@@ -572,6 +626,7 @@ int main(void) {
         if (kDown & KEY_START) break;
         if (kDown & KEY_SELECT) { if (settings_is_open()) settings_close(); else settings_open(); }
         settings_tick();
+        store_ui_tick();
         if (kDown & KEY_A) seq_set_playing(!seq.playing);
         if (kDown & KEY_B) { LightLock_Lock(&seq_lock); seq.pos = -1e-9; LightLock_Unlock(&seq_lock); }
         if (page == PAGE_SYNTH) synth_page_buttons(kDown, kHeld);     // L/R zoom, D-pad pan
@@ -599,7 +654,11 @@ int main(void) {
         // (or anywhere while its popup is open); everything else is ours.
         bool tdown = kDown & KEY_TOUCH, theld = kHeld & KEY_TOUCH, tup = hidKeysUp() & KEY_TOUCH;
         if (theld) hidTouchRead(&last_tp);
-        if (settings_is_open()) {                      // settings popup owns every touch
+        if (store_ui_is_open()) {                      // SAVE / LOAD / SONG popup owns every touch
+            if (tdown) store_ui_touch_down(last_tp.px, last_tp.py);
+            touch_owner_synth = false;
+            touch_btn = BTN_NONE;
+        } else if (settings_is_open()) {               // settings popup owns every touch
             if (tdown) settings_touch_down(last_tp.px, last_tp.py);
             touch_owner_synth = false;
             touch_btn = BTN_NONE;
@@ -622,6 +681,9 @@ int main(void) {
                 else if (b >= BTN_ROW && b < BTN_ROW + NROWS) sel_row = b - BTN_ROW;
                 else if (b == BTN_PLAY) seq_set_playing(!seq.playing);
                 else if (b == BTN_EXPAND) expand_on = !expand_on;
+                else if (b == BTN_SAVE) { store_ui_open(STORE_UI_SAVE); touch_btn = BTN_NONE; }
+                else if (b == BTN_LOAD) { store_ui_open(STORE_UI_LOAD); touch_btn = BTN_NONE; }
+                else if (b == BTN_SONG) { store_ui_open(STORE_UI_SONG); touch_btn = BTN_NONE; }
                 else if (b == BTN_NET) { settings_open(); touch_btn = BTN_NONE; }
                 else if (b == BTN_PAGE_PREV) page = (page + NPAGES - 1) % NPAGES;
                 else if (b == BTN_PAGE_NEXT) page = (page + 1) % NPAGES;

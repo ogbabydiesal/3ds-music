@@ -14,7 +14,7 @@ From top to bottom:
 
 | Area | What it does |
 |---|---|
-| **Header** | Page name and the **settings gear**: OSC output on/off, target IP/port, gyro over OSC. The gear is green while OSC is on. |
+| **Header** | Page name; **SAVE / LOAD / SONG**, where slots store the pattern and this synth patch; and the **settings gear**: OSC output on/off, target IP/port, gyro and accel over OSC. The gear is green while OSC is on. |
 | **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. **<** / **>** scroll the carousel once there are more classes. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
 | **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. |
@@ -121,7 +121,7 @@ Here the kick chain was copied and pasted, dragged below the original, retuned t
 - **It needs the DSP firmware file `sdmc:/3ds/dspfirm.cdc`.** Create it once by running the **DSP1** homebrew on your 3DS. Without it, the canvas shows "NO AUDIO: needs sdmc:/3ds/dspfirm.cdc" and everything else, including OSC, still works.
 - **Azahar:** copy the same file to `~/Library/Application Support/Azahar/sdmc/3ds/`.
 - Sound can land up to about 30 ms after the visual pulse, because of audio buffering. The OSC messages are sent on time.
-- Patches aren't saved yet. The starter patch is restored each time the app starts.
+- Patches are saved with **SAVE** (header) into one of 8 slots, together with the sequencer pattern. Use **LOAD** to bring them back. The starter patch is what you get at launch.
 
 ## Recipes
 

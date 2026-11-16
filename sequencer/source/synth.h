@@ -75,6 +75,8 @@ void syn_set_param(int node, int k, float v);
 void syn_set_wave_point(int node, int i, float v);
 void syn_toggle_output(int node, int track);
 void syn_clear_outputs(int node);
+// Replace the whole patch (e.g. loading a slot). Copies used/type/x/y/p/wt/input/outputs.
+void syn_replace_all(const SynNode src[SYN_MAX_NODES]);
 
 float syn_param_to_norm(const ParamDef *d, float v);
 float syn_norm_to_param(const ParamDef *d, float u);

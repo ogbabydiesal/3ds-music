@@ -21,6 +21,7 @@
 #include "netcfg.h"
 #include "page_synth.h"
 #include "settings.h"
+#include "store.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -60,6 +61,12 @@ Result HIDUSER_EnableAccelerometer(void) { return 0; }
 Result HIDUSER_DisableAccelerometer(void) { return 0; }
 Result HIDUSER_EnableGyroscope(void) { return 0; }
 Result HIDUSER_DisableGyroscope(void) { return 0; }
+// ---- stand-ins for main.c's sequencer hooks used by store.c ----
+static Pattern fake_pat = { 120, { {4,4,0,0}, {3,3,0,0}, {8,5,0,0}, {0,0,0,0}, {0,0,0,0} } };
+void seq_get_pattern(Pattern *o) { *o = fake_pat; }
+void seq_set_pattern(const Pattern *p) { fake_pat = *p; }
+bool seq_is_playing(void) { return true; }
+
 // plausible resting values for the screenshot: lying flat, slight hand movement
 void hidAccelRead(accelVector *v) { v->x = 18; v->y = -31; v->z = 509; }
 void hidGyroRead(angularRate *g) { g->x = 4; g->y = -2; g->z = 1; }
@@ -136,6 +143,9 @@ static void draw_chrome(bool playing) {
     text(6, 4, 0.48f, COL_FG, 0, "SYNTH");
     C2D_DrawRectSolid(288, 2, 0.5f, 28, 19, COL_BTN);                 // settings gear
     draw_gear(302, 11.5f, settings_osc_on() ? COL_ACCENT : COL_FG, COL_BTN);
+    draw_button(96, 2, 58, 19, COL_BTN, "SAVE", 0.42f);
+    draw_button(158, 2, 58, 19, COL_BTN, "LOAD", 0.42f);
+    draw_button(220, 2, 62, 19, song_mode_on() ? COL_ACCENT : COL_BTN, "SONG", 0.42f);
 
     float by = 204, bh = 32;
     draw_button(4, by, 74, bh, playing ? C2D_Color32(190, 60, 60, 255) : COL_ACCENT, playing ? "STOP" : "PLAY", 0.55f);
@@ -165,6 +175,7 @@ static void render(const char *path, bool playing) {
     draw_chrome(playing);
     synth_page_draw_popup();
     settings_draw();
+    store_ui_draw();
 
     CGImageRef img = CGBitmapContextCreateImage(ctx);
     CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)path, strlen(path), false);
@@ -194,10 +205,14 @@ int main(int argc, char **argv) {
     char out[1024];
     if (!realpath(argc > 1 ? argv[1] : ".", out)) return 1;
     mkdir("build", 0777);
-    chdir("build");                              // settings.c saves to "sdmc:/..."; keep that inside build/
+    chdir("build");                              // settings.c / store.c write files; keep them inside build/
+    mkdir("store", 0777);
+    unlink("store/song.txt");
+    for (int i = 1; i <= 8; i++) { char f[32]; snprintf(f, sizeof f, "store/slot%d.txt", i); unlink(f); }
     char p[1200];
 #define OUT(name) (snprintf(p, sizeof p, "%s/%s", out, name), p)
 
+    store_init();
     syn_init();                                  // starter: NOISE(0) -> ENV(1), ENV out on shape 1
     render(OUT("synth-1-starter.png"), false);
 
@@ -250,9 +265,41 @@ int main(int argc, char **argv) {
     // Settings popup (gear): default, then OSC + gyro turned on
     settings_open();
     render(OUT("settings-1-default.png"), false);
-    settings_touch_down(260, 62);                // OSC OUTPUT -> ON
-    settings_touch_down(260, 140);               // GYRO OSC  -> ON
+    settings_touch_down(260, 49);                // OSC OUTPUT -> ON
+    settings_touch_down(260, 127);               // GYRO  -> ON
+    settings_touch_down(260, 153);               // ACCEL -> ON
     render(OUT("settings-2-osc-on.png"), false);
     settings_close();
+
+    // SAVE: three slots with different patterns, then the LOAD view
+    Pattern pats[3] = {
+        { 120, { {4,4,0,0}, {3,3,0,0}, {8,5,0,0}, {0,0,0,0}, {0,0,0,0} } },
+        { 96,  { {4,4,0,0}, {0,0,0,0}, {8,5,0,0}, {6,3,0,0}, {0,0,0,0} } },
+        { 132, { {8,8,0,0}, {5,5,0,0}, {16,7,0,1}, {3,3,0,0}, {2,1,0,0} } },
+    };
+    for (int i = 0; i < 3; i++) { seq_set_pattern(&pats[i]); store_save_slot(i); }
+    store_ui_open(STORE_UI_SAVE);
+    store_ui_touch_down(16 + 10 + 2 * 68 + 20, (240 - 172) / 2 + 28 + 20);    // save into slot 3 -> message
+    render(OUT("store-1-save.png"), false);
+    store_ui_close();
+
+    // SONG: 1 x4, 2 x2, 1 x4, 3 x8 with song mode on
+    store_ui_open(STORE_UI_SONG);
+    int sgy = (240 - 184) / 2;
+    store_ui_touch_down(10 + 300 - 110 + 75, sgy + 10);                       // song mode ON
+    int adds[3][2] = { {2, 2}, {1, 4}, {3, 8} };                              // slot, bars for steps 2..4
+    for (int k = 0; k < 3; k++) {
+        store_ui_touch_down(10 + 10 + (k + 1) * 36 + 5, sgy + 32 + 5);        // "+" (copies the selected step)
+        int slot_now = k == 0 ? 1 : adds[k - 1][0], bars_now = k == 0 ? 4 : adds[k - 1][1];
+        while (slot_now != adds[k][0]) { store_ui_touch_down(10 + 10 + 40 + 60 + 5, sgy + 112 + 5); slot_now = slot_now % 8 + 1; }
+        while (bars_now < adds[k][1]) { store_ui_touch_down(10 + 152 + 40 + 60 + 5, sgy + 112 + 5); bars_now++; }
+        while (bars_now > adds[k][1]) { store_ui_touch_down(10 + 152 + 40 + 5, sgy + 112 + 5); bars_now--; }
+    }
+    Pattern sp;
+    song_on_play(&sp);
+    for (int b = 0; b < 5; b++) song_on_bar(&sp);                             // now on step 2
+    store_ui_touch_down(10 + 10 + 1 * 36 + 5, sgy + 32 + 5);                  // select step 2
+    render(OUT("store-2-song.png"), true);
+    store_ui_close();
     return 0;
 }
