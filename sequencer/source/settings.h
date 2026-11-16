@@ -14,3 +14,4 @@ void settings_close(void);
 void settings_touch_down(int x, int y);     // may open the system keyboard: call outside a frame
 void settings_draw(void);                   // last, over everything on the bottom screen
 void settings_tick(void);                   // once per frame: sends gyro when enabled
+void settings_exit(void);                   // turns the motion sensors off

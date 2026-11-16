@@ -670,6 +670,7 @@ int main(void) {
     threadJoin(th, U64_MAX);
     threadFree(th);
     syn_audio_stop();
+    settings_exit();
     if (ui_font) C2D_FontFree(ui_font);
     romfsExit();
     C2D_TextBufDelete(tbuf);

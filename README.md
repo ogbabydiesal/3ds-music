@@ -142,7 +142,7 @@ Each track has these settings:
 |---|---|---|
 | OSC OUTPUT | **OFF** | Sends `/shape_N/pulse` messages. Sound on the SYNTH page plays either way. |
 | TARGET IP / PORT | from config | Tap to type with the system keyboard. Shared with osc3ds through `sdmc:/3ds/osc3ds/config.ini`. |
-| GYRO OSC | OFF | Sends `/gyro x y z` (angular rate) and `/accel x y z` (≈1.0 = 1 g) about 30 times a second. Only while OSC OUTPUT is on. |
+| GYRO OSC | OFF | Sends `/gyro x y z` (angular rate) and `/accel x y z` (≈1.0 = 1 g) about 30 times a second. Only while OSC OUTPUT is on. The row also shows live sensor readings, so you can check the sensors on the 3DS. |
 | THIS 3DS | – | This 3DS's IP address, for reference. |
 
 The OSC and gyro choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3ds is unaffected: it always sends.

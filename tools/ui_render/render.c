@@ -60,8 +60,9 @@ Result HIDUSER_EnableAccelerometer(void) { return 0; }
 Result HIDUSER_DisableAccelerometer(void) { return 0; }
 Result HIDUSER_EnableGyroscope(void) { return 0; }
 Result HIDUSER_DisableGyroscope(void) { return 0; }
-void hidAccelRead(accelVector *v) { memset(v, 0, sizeof *v); }
-void hidGyroRead(angularRate *g) { memset(g, 0, sizeof *g); }
+// plausible resting values for the screenshot: lying flat, slight hand movement
+void hidAccelRead(accelVector *v) { v->x = 18; v->y = -31; v->z = 509; }
+void hidGyroRead(angularRate *g) { g->x = 4; g->y = -2; g->z = 1; }
 
 bool C2D_DrawLine(float x0, float y0, u32 c0, float x1, float y1, u32 c1, float th, float d) {
     (void)c1; (void)d;

@@ -19,9 +19,24 @@ bool settings_is_open(void) { return open_; }
 void settings_open(void)    { open_ = true; }
 void settings_close(void)   { open_ = false; }
 
-static void apply_gyro_sensors(void) {
-    if (gyro_on) { HIDUSER_EnableAccelerometer(); HIDUSER_EnableGyroscope(); }
-    else         { HIDUSER_DisableGyroscope(); HIDUSER_DisableAccelerometer(); }
+// The HID service counts enable/disable requests, so calling Disable before
+// any Enable leaves the sensors off even after a later Enable. Turn them on
+// exactly once at startup and off once at exit; the GYRO toggle only decides
+// whether readings are sent.
+static bool sensors_on = false;
+
+static void sensors_start(void) {
+    if (sensors_on) return;
+    HIDUSER_EnableAccelerometer();
+    HIDUSER_EnableGyroscope();
+    sensors_on = true;
+}
+
+void settings_exit(void) {
+    if (!sensors_on) return;
+    HIDUSER_DisableGyroscope();
+    HIDUSER_DisableAccelerometer();
+    sensors_on = false;
 }
 
 static void save(void) {
@@ -44,7 +59,7 @@ void settings_load(void) {
         }
         fclose(f);
     }
-    apply_gyro_sensors();
+    sensors_start();
 }
 
 // ~30 Hz motion over OSC, only while both OSC output and gyro are on.
@@ -114,7 +129,15 @@ void settings_draw(void) {
         case ROW_PORT:  field(y, port, osc_on); break;
         case ROW_GYRO:
             toggle_seg(y, gyro_on, osc_on);
-            text(SX + 10, y + 15, 0.3f, COL_DIM, 0, osc_on ? "sends /gyro + /accel" : "needs OSC output on");
+            if (!osc_on) text(SX + 10, y + 15, 0.3f, COL_DIM, 0, "needs OSC output on");
+            else {                                   // live readout, to check the sensors
+                accelVector a;
+                angularRate g;
+                hidAccelRead(&a);
+                hidGyroRead(&g);
+                text(SX + 10, y + 15, 0.28f, gyro_on ? COL_ACCENT : COL_DIM, 0, "g %d %d %d  a %.1f %.1f %.1f",
+                     g.x, g.y, g.z, a.x / 512.0, a.y / 512.0, a.z / 512.0);
+            }
             break;
         case ROW_LOCAL: text(CTRL_X + CTRL_W - 2, y + 6, 0.4f, COL_DIM, C2D_AlignRight, "%s", net_local_ip()); break;
         }
@@ -136,7 +159,7 @@ void settings_touch_down(int x, int y) {
         bool right_half = x >= CTRL_X + CTRL_W / 2.0f;
         switch (r) {
         case ROW_OSC:  osc_on = right_half; save(); break;
-        case ROW_GYRO: gyro_on = right_half; apply_gyro_sensors(); save(); break;
+        case ROW_GYRO: gyro_on = right_half; save(); break;
         case ROW_IP:   net_edit_host(); break;     // system keyboard
         case ROW_PORT: net_edit_port(); break;
         }
