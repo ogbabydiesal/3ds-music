@@ -6,9 +6,9 @@ Everything in this repo was written in one conversation with an AI coding agent.
 |---|---|
 | **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
 | **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
-| **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 00:05 (US Eastern), about 22 hours of calendar time, most of it the author away or testing |
-| **Claude's working time** | **about 55 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
-| **Prompts** | 20 written prompts (one sent mid-turn), plus a font choice answered in a question box, short button replies, a pasted installer log, and build/send commands run from the chat box |
+| **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 00:35 (US Eastern), about 23 hours of calendar time, most of it the author away or testing |
+| **Claude's working time** | **about 1 hour** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
+| **Prompts** | 21 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
 
 **About the working time:** it's measured from the session transcript timestamps, from each prompt to the end of Claude's reply. It includes thinking, writing code and waiting on tools such as compiles and installs. Reasoning time can't be separated out, because the transcript doesn't record it. The three biggest turns were the first sequencer (~8 min), the synth page (~6.6 min), and oscillators with zoom, box select and copy/paste (~4.7 min).
 
@@ -43,7 +43,9 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 23 | 23:35 | ~17 min | add the .3ds file to a builds folder maybe? or where would be the best place for that? (remember to add every prompt to the prompts.md) |
 | – | 23:37 | – | *(question box: which font for the public eucseq build, since Arial can't be redistributed)* → **3DS system font** |
 | 24 | 23:47 | *(sent mid-turn)* | why is it taking so long to build the binaries? |
-| 25 | 23:58 | ~6 min | document the synthesis section with screenshots |
+| 25 | 23:58 | 3.2 min | document the synthesis section with screenshots |
+| 26 | Nov 16 00:24 | ~8 min | disable osc output by default, and in the IP address text in the upper right hand corner of the bottom screen replace with a a settings gear icon, encapsulate the OSC settings there, allow me to turn on and off gyro, settings |
+| – | 00:25 | – | *(question box: what the gyro toggle should do)* → **Send gyro over OSC** |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -66,3 +68,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
 7. **SYNTH documentation**:
    - [docs/SYNTH.md](SYNTH.md): a guide to every node, setting and gesture, with recipes.
    - Six screenshots rendered by `tools/ui_render`, a macOS harness that compiles the app's real SYNTH-page code against a CoreGraphics/CoreText stand-in for citro2d and scripts the scenes with simulated stylus input. Claude couldn't capture the 3DS screen and had been asked not to control the author's computer.
+8. **Settings gear**: OSC output is now off by default. A gear icon replaces the header IP text and opens a SETTINGS box with OSC on/off, target IP and port, gyro over OSC (`/gyro`, `/accel`), and this 3DS's IP. The choices are saved to `eucseq.ini`. The screenshot renderer now draws the settings box too.

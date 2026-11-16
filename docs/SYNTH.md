@@ -1,6 +1,6 @@
 # eucseq SYNTH page
 
-The SYNTH page is a small modular synthesizer on the 3DS touchscreen. You build instruments by patching **nodes** together, then choose which sequencer **shapes** play them. Each time the star reaches a shape, every instrument that outputs to that shape is triggered. The OSC `/shape_N/pulse` messages are still sent as usual.
+The SYNTH page is a small modular synthesizer on the 3DS touchscreen. You build instruments by patching **nodes** together, then choose which sequencer **shapes** play them. Each time the star reaches a shape, every instrument that outputs to that shape is triggered. The sound plays whether or not OSC output is on. OSC is off by default and has its own switch in **Settings**, under the gear icon.
 
 To get there, tap **>** in the bottom bar of the sequencer page. The dots between the arrows show which page you're on.
 
@@ -14,7 +14,7 @@ From top to bottom:
 
 | Area | What it does |
 |---|---|
-| **Header** | Page name, the OSC target address, and **SET IP**. |
+| **Header** | Page name and the **settings gear**: OSC output on/off, target IP/port, gyro over OSC. The gear is green while OSC is on. |
 | **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. **<** / **>** scroll the carousel once there are more classes. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
 | **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. |

@@ -31,7 +31,7 @@ These are rendered on a Mac from the app's own UI code. See **[docs/SYNTH.md](do
 
 These are from the Azahar emulator on earlier builds. The current build differs in several ways:
 - Shapes sit on the ring until you press EXPAND.
-- SET IP is in the header, with < > page arrows in the bottom bar.
+- A settings gear is in the header, with < > page arrows in the bottom bar.
 - The UI font is Arial.
 - There's a SYNTH page.
 
@@ -110,13 +110,15 @@ The ring is **one bar (4 beats)**. A white 5-point star sweeps around it. Five *
 
 `<obj>` is an int giving the object's position on the track (1…DIVS, clockwise from the top). Pulses are timed on a 1 ms thread, not the 60 fps frame loop.
 
+**OSC output is OFF by default.** Turn it on in **Settings**, using the gear icon or SELECT.
+
 Each track has these settings:
 - **DIVS** (0–32): how many equal subdivisions of the ring the track has. Adding divisions adds more of that shape.
 - **PULSES**: how many of those subdivisions get a shape, spread out Euclidean-style. Empty subdivisions show as tiny dim ticks. PULSES follows DIVS until you lower it.
 - **ROTATE** (0–359°): slides that track's shapes around the ring by that many degrees. They fire when the star reaches their new position, so this also shifts their timing. Hold ± to speed up, or hold ZR with the D-pad for ±10°.
 - **Mute**: dims the shape and stops its OSC.
 
-**Bottom screen:** the header has EXPAND on the left and the target address with a SET IP button on the right. Below it is a tile per track. Tap a tile to select that track, and tap its lower **mute** strip to mute it. Below that are DIVS / PULSES / ROTATE for the selected track, then PLAY and BPM (20–300). The right end of the bottom bar is free for upcoming page buttons.
+**Bottom screen:** the header has EXPAND on the left and a **settings gear** on the right. The gear is green while OSC output is on. Below it is a tile per track. Tap a tile to select that track, and tap its lower **mute** strip to mute it. Below that are DIVS / PULSES / ROTATE for the selected track, then PLAY and BPM (20–300). The right end of the bottom bar has the **< >** page arrows.
 
 | Control | Action |
 |---|---|
@@ -129,8 +131,21 @@ Each track has these settings:
 | D-pad ←→ | change value (hold ZR for ±10) |
 | Circle pad | orbit the 3D view (Y resets it) |
 | 3D slider | depth |
-| SELECT | set target IP / port (shared with osc3ds) |
+| SELECT / gear icon | open or close **Settings** |
 | START | quit |
+
+### Settings (gear icon)
+
+![Settings with OSC and gyro on](docs/screenshots/settings-2-osc-on.png)
+
+| Setting | Default | What it does |
+|---|---|---|
+| OSC OUTPUT | **OFF** | Sends `/shape_N/pulse` messages. Sound on the SYNTH page plays either way. |
+| TARGET IP / PORT | from config | Tap to type with the system keyboard. Shared with osc3ds through `sdmc:/3ds/osc3ds/config.ini`. |
+| GYRO OSC | OFF | Sends `/gyro x y z` (angular rate) and `/accel x y z` (≈1.0 = 1 g) about 30 times a second. Only while OSC OUTPUT is on. |
+| THIS 3DS | – | This 3DS's IP address, for reference. |
+
+The OSC and gyro choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3ds is unaffected: it always sends.
 
 ### SYNTH page
 

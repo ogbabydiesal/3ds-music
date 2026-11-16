@@ -16,3 +16,14 @@ enum {
     KEY_DRIGHT = BIT(4), KEY_DLEFT = BIT(5), KEY_DUP = BIT(6), KEY_DDOWN = BIT(7),
     KEY_R = BIT(8), KEY_L = BIT(9), KEY_X = BIT(10), KEY_Y = BIT(11),
 };
+
+typedef int16_t s16;
+typedef int32_t Result;
+typedef struct { s16 x, y, z; } accelVector;
+typedef struct { s16 x, z, y; } angularRate;
+Result HIDUSER_EnableAccelerometer(void);
+Result HIDUSER_DisableAccelerometer(void);
+Result HIDUSER_EnableGyroscope(void);
+Result HIDUSER_DisableGyroscope(void);
+void hidAccelRead(accelVector *v);
+void hidGyroRead(angularRate *r);

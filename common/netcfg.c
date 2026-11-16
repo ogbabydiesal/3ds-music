@@ -107,18 +107,31 @@ static bool keyboard_input(const char *hint, const char *initial, char *out, siz
     return true;
 }
 
-void net_edit_settings(void) {
+void net_edit_host(void) {
     char buf[64];
-    if (keyboard_input("Target IP address", net_cfg.host, buf, sizeof buf))
+    if (keyboard_input("Target IP address", net_cfg.host, buf, sizeof buf)) {
         snprintf(net_cfg.host, sizeof net_cfg.host, "%s", buf);
-    char portstr[8];
+        net_config_save();
+        net_update_dest();
+    }
+}
+
+void net_edit_port(void) {
+    char buf[64], portstr[8];
     snprintf(portstr, sizeof portstr, "%d", net_cfg.port);
     if (keyboard_input("Target UDP port", portstr, buf, 6)) {
         int p = atoi(buf);
-        if (p > 0 && p < 65536) net_cfg.port = p;
+        if (p > 0 && p < 65536) {
+            net_cfg.port = p;
+            net_config_save();
+            net_update_dest();
+        }
     }
-    net_config_save();
-    net_update_dest();
+}
+
+void net_edit_settings(void) {
+    net_edit_host();
+    net_edit_port();
 }
 
 const char *net_local_ip(void) {

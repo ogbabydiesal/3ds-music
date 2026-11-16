@@ -22,6 +22,7 @@
 
 #include "netcfg.h"
 #include "page_synth.h"
+#include "settings.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -124,7 +125,7 @@ static void seq_thread(void *arg) {
         for (int i = 0; i < nfire; i++) {
             char addr[32];
             snprintf(addr, sizeof addr, "/shape_%d/pulse", fire[i].track);
-            net_send(addr, "i", (int)fire[i].obj);
+            if (settings_osc_on()) net_send(addr, "i", (int)fire[i].obj);   // OSC off by default
             syn_trigger(fire[i].track - 1);   // play any instrument assigned to this shape
         }
         svcSleepThread(1000000LL);  // 1 ms
@@ -359,7 +360,7 @@ static int sel_row = ROW_DIVS;
 #define BTN_W     54
 #define BAR_Y     204
 #define BAR_H     32
-#define HDR_IP_BTN_X 256          // SET IP button in the header
+#define HDR_IP_BTN_X 288          // settings gear button in the header
 #define PAGE_PREV_X  224          // < > page arrows in the bottom bar
 #define PAGE_NEXT_X  271
 #define PAGE_BTN_W   45
@@ -468,9 +469,9 @@ static void draw_bottom(const Seq *s, int pressed) {
         text(6, 4, 0.48f, fg, 0, "%s", page_names[page]);
     }
     // Target address + SET IP (header, right)
-    text(HDR_IP_BTN_X - 6, 6, 0.4f, dim, C2D_AlignRight, "-> %s:%d", net_cfg.host, net_cfg.port);
+    // Settings gear (header, right). Green while OSC output is on.
     C2D_DrawRectSolid(HDR_IP_BTN_X, 2, 0.5f, BOT_W - 4 - HDR_IP_BTN_X, 19, pressed == BTN_NET ? accent : btn);
-    text((HDR_IP_BTN_X + BOT_W - 4) / 2.0f, 4, 0.42f, fg, C2D_AlignCenter, "SET IP");
+    draw_gear((HDR_IP_BTN_X + BOT_W - 4) / 2.0f, 11.5f, settings_osc_on() ? accent : fg, pressed == BTN_NET ? accent : btn);
 
     if (page == PAGE_SEQ) draw_seq_page(s, pressed);
 
@@ -488,6 +489,7 @@ static void draw_bottom(const Seq *s, int pressed) {
         C2D_DrawRectSolid(268 - NPAGES * 3 + i * 6 + 2, BAR_Y + BAR_H - 5, 0.5f, 3, 3, i == page ? fg : COL_LINE);
 
     if (page == PAGE_SYNTH) synth_page_draw_popup();
+    settings_draw();
 }
 
 static void draw_seq_page(const Seq *s, int pressed) {
@@ -546,6 +548,7 @@ int main(void) {
     build_meshes();
     net_config_load();
     bool net_ok = net_init();
+    settings_load();                                  // OSC output + gyro toggles
 
     syn_init();
     syn_audio_start();                                // needs sdmc:/3ds/dspfirm.cdc
@@ -567,7 +570,8 @@ int main(void) {
         u32 kDown = hidKeysDown(), kHeld = hidKeysHeld(), kRep = hidKeysDownRepeat();
 
         if (kDown & KEY_START) break;
-        if (kDown & KEY_SELECT) net_edit_settings();
+        if (kDown & KEY_SELECT) { if (settings_is_open()) settings_close(); else settings_open(); }
+        settings_tick();
         if (kDown & KEY_A) seq_set_playing(!seq.playing);
         if (kDown & KEY_B) { LightLock_Lock(&seq_lock); seq.pos = -1e-9; LightLock_Unlock(&seq_lock); }
         if (page == PAGE_SYNTH) synth_page_buttons(kDown, kHeld);     // L/R zoom, D-pad pan
@@ -595,6 +599,11 @@ int main(void) {
         // (or anywhere while its popup is open); everything else is ours.
         bool tdown = kDown & KEY_TOUCH, theld = kHeld & KEY_TOUCH, tup = hidKeysUp() & KEY_TOUCH;
         if (theld) hidTouchRead(&last_tp);
+        if (settings_is_open()) {                      // settings popup owns every touch
+            if (tdown) settings_touch_down(last_tp.px, last_tp.py);
+            touch_owner_synth = false;
+            touch_btn = BTN_NONE;
+        } else {
         if (tdown)
             touch_owner_synth = page == PAGE_SYNTH &&
                 (synth_page_popup_open() || (last_tp.py >= SYNTH_AREA_Y0 && last_tp.py < SYNTH_AREA_Y1));
@@ -613,7 +622,7 @@ int main(void) {
                 else if (b >= BTN_ROW && b < BTN_ROW + NROWS) sel_row = b - BTN_ROW;
                 else if (b == BTN_PLAY) seq_set_playing(!seq.playing);
                 else if (b == BTN_EXPAND) expand_on = !expand_on;
-                else if (b == BTN_NET) { net_edit_settings(); touch_btn = BTN_NONE; }
+                else if (b == BTN_NET) { settings_open(); touch_btn = BTN_NONE; }
                 else if (b == BTN_PAGE_PREV) page = (page + NPAGES - 1) % NPAGES;
                 else if (b == BTN_PAGE_NEXT) page = (page + 1) % NPAGES;
                 else apply_button(b, 1);
@@ -626,6 +635,7 @@ int main(void) {
         } else {
             touch_btn = BTN_NONE;
         }
+        }   // settings closed
 
         LightLock_Lock(&seq_lock);
         Seq snap = seq;

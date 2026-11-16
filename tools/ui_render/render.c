@@ -14,7 +14,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "netcfg.h"
 #include "page_synth.h"
+#include "settings.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -35,6 +41,27 @@ bool C2D_DrawRectSolid(float x, float y, float z, float w, float h, u32 clr) {
     CGContextFillRect(ctx, CGRectMake(x, y, w, h));
     return true;
 }
+
+bool C2D_DrawCircleSolid(float x, float y, float z, float rad, u32 clr) {
+    (void)z;
+    set_fill(clr);
+    CGContextFillEllipseInRect(ctx, CGRectMake(x - rad, y - rad, rad * 2, rad * 2));
+    return true;
+}
+
+// ---- stand-ins for the 3DS network / motion APIs used by settings.c ----
+NetConfig net_cfg = { "192.168.1.173", 9000, "/3ds" };
+volatile unsigned long net_sent = 0, net_errors = 0;
+void net_send(const char *a, const char *t, ...) { (void)a; (void)t; }
+void net_edit_host(void) {}
+void net_edit_port(void) {}
+const char *net_local_ip(void) { return "192.168.1.160"; }
+Result HIDUSER_EnableAccelerometer(void) { return 0; }
+Result HIDUSER_DisableAccelerometer(void) { return 0; }
+Result HIDUSER_EnableGyroscope(void) { return 0; }
+Result HIDUSER_DisableGyroscope(void) { return 0; }
+void hidAccelRead(accelVector *v) { memset(v, 0, sizeof *v); }
+void hidGyroRead(angularRate *g) { memset(g, 0, sizeof *g); }
 
 bool C2D_DrawLine(float x0, float y0, u32 c0, float x1, float y1, u32 c1, float th, float d) {
     (void)c1; (void)d;
@@ -106,9 +133,8 @@ static void draw_button(float x, float y, float w, float h, u32 fill, const char
 
 static void draw_chrome(bool playing) {
     text(6, 4, 0.48f, COL_FG, 0, "SYNTH");
-    text(250, 6, 0.4f, COL_DIM, C2D_AlignRight, "-> 192.168.1.173:9000");
-    C2D_DrawRectSolid(256, 2, 0.5f, 60, 19, COL_BTN);
-    text(286, 4, 0.42f, COL_FG, C2D_AlignCenter, "SET IP");
+    C2D_DrawRectSolid(288, 2, 0.5f, 28, 19, COL_BTN);                 // settings gear
+    draw_gear(302, 11.5f, settings_osc_on() ? COL_ACCENT : COL_FG, COL_BTN);
 
     float by = 204, bh = 32;
     draw_button(4, by, 74, bh, playing ? C2D_Color32(190, 60, 60, 255) : COL_ACCENT, playing ? "STOP" : "PLAY", 0.55f);
@@ -137,6 +163,7 @@ static void render(const char *path, bool playing) {
     synth_page_draw();
     draw_chrome(playing);
     synth_page_draw_popup();
+    settings_draw();
 
     CGImageRef img = CGBitmapContextCreateImage(ctx);
     CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)path, strlen(path), false);
@@ -163,8 +190,11 @@ static int ncx(int i) { return 4 + (int)syn_nodes[i].x + 32; }
 static int ncy(int i) { return 73 + (int)syn_nodes[i].y + 15; }
 
 int main(int argc, char **argv) {
-    const char *out = argc > 1 ? argv[1] : ".";
-    char p[512];
+    char out[1024];
+    if (!realpath(argc > 1 ? argv[1] : ".", out)) return 1;
+    mkdir("build", 0777);
+    chdir("build");                              // settings.c saves to "sdmc:/..."; keep that inside build/
+    char p[1200];
 #define OUT(name) (snprintf(p, sizeof p, "%s/%s", out, name), p)
 
     syn_init();                                  // starter: NOISE(0) -> ENV(1), ENV out on shape 1
@@ -215,5 +245,13 @@ int main(int argc, char **argv) {
     syn_set_param(syn_nodes[syn_nodes[pasted].input].input >= 0 ? syn_nodes[pasted].input : pasted, OSC_FREQ, 110);
     tap(105, 61);                                // tap the % button: fit everything
     render(OUT("synth-6-copy-paste-zoom.png"), false);
+
+    // Settings popup (gear): default, then OSC + gyro turned on
+    settings_open();
+    render(OUT("settings-1-default.png"), false);
+    settings_touch_down(260, 62);                // OSC OUTPUT -> ON
+    settings_touch_down(260, 140);               // GYRO OSC  -> ON
+    render(OUT("settings-2-osc-on.png"), false);
+    settings_close();
     return 0;
 }
