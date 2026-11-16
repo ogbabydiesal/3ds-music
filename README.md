@@ -19,6 +19,16 @@ To make release builds yourself, run `make release`. It writes both files to `di
 
 ## Screenshots
 
+### SYNTH page (current build)
+
+| Two instruments: hi-hat and kick | Oscillator with a hand-drawn wave |
+|---|---|
+| ![SYNTH page](docs/screenshots/synth-3-two-instruments.png) | ![OSC settings](docs/screenshots/synth-4-osc-custom-wave.png) |
+
+These are rendered on a Mac from the app's own UI code. See **[docs/SYNTH.md](docs/SYNTH.md)** for the full guide with more screenshots.
+
+### Sequencer (earlier builds)
+
 These are from the Azahar emulator on earlier builds. The current build differs in several ways:
 - Shapes sit on the ring until you press EXPAND.
 - SET IP is in the header, with < > page arrows in the bottom bar.
@@ -124,6 +134,8 @@ Each track has these settings:
 
 ### SYNTH page
 
+**Full guide with screenshots: [docs/SYNTH.md](docs/SYNTH.md).**
+
 Use the **<** and **>** buttons at the right of the bottom bar to switch pages.
 
 - **Carousel** (top row): **OSC**, **NOISE** and **ENV**. Tap a class to add it to the canvas, or drag it to place it.
@@ -157,4 +169,6 @@ common/osc.c/.h      portable OSC encoder
 common/netcfg.c/.h   shared config file, UDP socket, IP/port keyboard
 tools/osc_monitor.py desktop receiver for debugging
 tools/test_osc.c     host-side encoder test
+tools/ui_render/     renders SYNTH page screenshots on macOS from the real UI code
+docs/                SYNTH.md guide, PROMPTS.md build log, screenshots
 ```

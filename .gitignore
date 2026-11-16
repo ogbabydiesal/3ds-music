@@ -10,3 +10,4 @@ sequencer/romfs/arial.bcfnt
 
 .DS_Store
 dist/
+tools/ui_render/build/

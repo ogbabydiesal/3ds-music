@@ -416,5 +416,8 @@ bool syn_audio_ok(void) { return audio_ok; }
 #else
 bool syn_audio_start(void) { return false; }
 void syn_audio_stop(void) {}
-bool syn_audio_ok(void) { return false; }
+#ifndef SYN_HOST_AUDIO_OK
+#define SYN_HOST_AUDIO_OK 0
+#endif
+bool syn_audio_ok(void) { return SYN_HOST_AUDIO_OK; }   // host builds (tests, UI renderer)
 #endif
