@@ -92,6 +92,7 @@ release:
 	$(MAKE) clean && $(MAKE) all && cp $(TARGET).3dsx dist/
 	$(MAKE) -C sequencer clean && $(MAKE) -C sequencer all ROMFS= FONT_OUT= && cp sequencer/eucseq.3dsx dist/
 	$(MAKE) -C sequencer clean && $(MAKE) -C sequencer all
+	cp THIRD_PARTY_NOTICES.md dist/
 	@ls -l dist
 
 # Preview in the Azahar emulator. Override with: make run AZAHAR=/path/to/Azahar.app

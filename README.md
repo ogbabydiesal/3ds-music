@@ -148,6 +148,13 @@ Each track has these settings:
 
 The OSC, gyro and accel choices are saved to `sdmc:/3ds/osc3ds/eucseq.ini`. osc3ds is unaffected: it always sends.
 
+**CREDITS** (bottom-left of the box) opens an attribution page:
+- **GRAINS**: an implementation of the Beads granular algorithm by Emilie Gillet / Mutable Instruments (not affiliated).
+- **REVERB**: STK's JCRev, with its copyright.
+- The pink-noise filter and the libraries.
+
+![Credits page](docs/screenshots/settings-3-credits.png)
+
 ### Save, load and song
 
 | SAVE (8 slots) | SONG chain |
@@ -187,12 +194,12 @@ Sequencers and their assignments are saved in slots along with the synth patch. 
 
 Use the **<** and **>** buttons at the right of the bottom bar to switch pages: SEQUENCER → SYNTH → STEPS.
 
-- **Carousel** (top row): **OSC**, **NOISE**, **ENV**, **REVERB** and **BEADS** (scroll with **<** / **>**). Tap a class to add it to the canvas, or drag it to place it.
+- **Carousel** (top row): **OSC**, **NOISE**, **ENV**, **REVERB** and **GRAINS** (scroll with **<** / **>**). Tap a class to add it to the canvas, or drag it to place it.
   - **OSC**: WAVE (SINE, TRI, SAW, SQR, CUST), FREQ (20–4000 Hz), PW (pulse width for SQR), MOD and LEVEL. Choosing **CUST** shows a 16-point waveform you draw with the stylus. The OSC input bends pitch by MOD octaves, so patch an ENV into it for kick drums and zaps.
   - **NOISE**: TYPE (WHITE, PINK, BROWN) and LEVEL.
   - **ENV**: ATTACK, DECAY, SUSTAIN, RELEASE, LENGTH and LEVEL. It shapes the volume of whatever is patched into it. With nothing plugged in, it outputs the envelope shape itself, which is useful for modulating an OSC.
   - **REVERB**: a stereo port of STK's **JCRev** (John Chowning's reverb): 3 allpasses, 4 damped combs and 2 output delays. Settings: T60 (0.1–20 s), MIX and LEVEL. Patch an instrument into it and turn OUTPUT on for the REVERB.
-  - **BEADS**: a granular texture processor modeled on Mutable Instruments Beads. It records its input into an 8 s buffer and plays up to 16 stereo grains. Settings: TIME, SIZE, SHAPE, PITCH, DENSITY (steady or random), RANDOM, FEEDBACK, MIX, DIR (forward/reverse/both) and FREEZE. Shape pulses seed grains, like Beads' SEED.
+  - **GRAINS**: a granular texture processor, an implementation of the Mutable Instruments Beads algorithm (credited in Settings → CREDITS). It records its input into an 8 s buffer and plays up to 16 stereo grains. Settings: TIME, SIZE, SHAPE, PITCH, DENSITY (steady or random), RANDOM, FEEDBACK, MIX, DIR (forward/reverse/both) and FREEZE. Shape pulses seed grains, like Beads' SEED.
 - **Toolbar:**
   - **BOX / PAN** sets what dragging on empty canvas does: box-select or pan.
   - **−** / **%** / **+** zoom. Tap the percentage to fit everything on screen.
@@ -226,4 +233,4 @@ docs/                SYNTH.md guide, PROMPTS.md build log, screenshots
 
 ## Licences
 
-See **[docs/LICENSES.md](docs/LICENSES.md)** for an audit of every algorithm, library and asset, and **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** for the notices to ship with builds. The REVERB node is derived from STK's JCRev, under the MIT-style STK licence. BEADS is an independent implementation inspired by Mutable Instruments' Beads.
+See **[docs/LICENSES.md](docs/LICENSES.md)** for an audit of every algorithm, library and asset, and **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** for the notices to ship with builds. The REVERB node is derived from STK's JCRev, under the MIT-style STK licence. GRAINS is an independent implementation of the granular algorithm of Mutable Instruments' Beads.

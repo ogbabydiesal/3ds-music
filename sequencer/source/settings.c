@@ -12,14 +12,15 @@ static bool osc_on = false;         // OSC output is OFF until the user turns it
 static bool gyro_on = false;
 static bool accel_on = false;
 static bool open_ = false;
+static bool credits_ = false;              // showing the CREDITS page
 static unsigned frame = 0;
 
 bool settings_osc_on(void)  { return osc_on; }
 bool settings_gyro_on(void) { return gyro_on; }
 bool settings_accel_on(void) { return accel_on; }
 bool settings_is_open(void) { return open_; }
-void settings_open(void)    { open_ = true; }
-void settings_close(void)   { open_ = false; }
+void settings_open(void)    { open_ = true; credits_ = false; }
+void settings_close(void)   { open_ = false; credits_ = false; }
 
 // The HID service counts enable/disable requests, so calling Disable before
 // any Enable leaves the sensors off even after a later Enable. Turn them on
@@ -113,12 +114,39 @@ static void field(float y, const char *value, bool enabled) {
     text(CTRL_X + 8, y + 6, 0.4f, enabled ? COL_FG : COL_DIM, 0, "%s", value);
 }
 
+// Attribution for the algorithms the synth is built on (see docs/LICENSES.md).
+static void credits_draw(float y0) {
+    text(SX + 10, y0 + 5, 0.5f, COL_FG, 0, "CREDITS");
+    static const struct { const char *head; const char *lines[3]; } cr[] = {
+        { "GRAINS", { "An implementation of the Beads granular algorithm",
+                      "by Emilie Gillet / Mutable Instruments, written from",
+                      "its manual. Not affiliated with Mutable Instruments." } },
+        { "REVERB", { "JCRev from the Synthesis ToolKit (STK), after John",
+                      "Chowning. Copyright (c) 1995-2023 Perry R. Cook and",
+                      "Gary P. Scavone. STK license (MIT-style)." } },
+        { "NOISE",  { "Pink noise: Paul Kellett's filter (music-dsp).", NULL, NULL } },
+        { "LIBRARIES", { "libctru, citro2d, citro3d (zlib); newlib.",
+                         "Full notices: THIRD_PARTY_NOTICES.md", NULL } },
+    };
+    float y = y0 + TITLE_H;
+    for (size_t i = 0; i < sizeof cr / sizeof cr[0]; i++) {
+        text(SX + 10, y, 0.38f, COL_ACCENT, 0, "%s", cr[i].head);
+        y += 13;
+        for (int k = 0; k < 3 && cr[i].lines[k]; k++) { text(SX + 10, y, 0.31f, COL_FG, 0, "%s", cr[i].lines[k]); y += 11; }
+        y += 4;
+    }
+    float cy = close_y();
+    C2D_DrawRectSolid(SX + SW - 10 - 84, cy, 0.5f, 84, 24, COL_BTN);
+    text(SX + SW - 10 - 42, cy + 5, 0.42f, COL_FG, C2D_AlignCenter, "BACK");
+}
+
 void settings_draw(void) {
     if (!open_) return;
     float y0 = pop_y(), h = pop_h();
     C2D_DrawRectSolid(0, 0, 0.5f, BOT_W, 240, C2D_Color32(0, 0, 0, 150));
     C2D_DrawRectSolid(SX, y0, 0.5f, SW, h, COL_PANEL);
     rect_outline(SX, y0, SW, h, COL_LINE);
+    if (credits_) { credits_draw(y0); return; }
     draw_gear(SX + 16, y0 + 14, osc_on ? COL_ACCENT : COL_FG, COL_PANEL);
     text(SX + 30, y0 + 5, 0.5f, COL_FG, 0, "SETTINGS");
 
@@ -146,14 +174,20 @@ void settings_draw(void) {
     float cy = close_y();
     C2D_DrawRectSolid(SX + SW - 10 - 84, cy, 0.5f, 84, 24, COL_BTN);
     text(SX + SW - 10 - 42, cy + 5, 0.42f, COL_FG, C2D_AlignCenter, "CLOSE");
-    text(SX + 10, cy + 6, 0.32f, COL_DIM, 0, "OSC messages: /shape_N/pulse");
+    C2D_DrawRectSolid(SX + 10, cy, 0.5f, 84, 24, COL_BTN);
+    text(SX + 10 + 42, cy + 5, 0.42f, COL_FG, C2D_AlignCenter, "CREDITS");
 }
 
 void settings_touch_down(int x, int y) {
     float y0 = pop_y();
-    if (x < SX || x >= SX + SW || y < y0 || y >= y0 + pop_h()) { open_ = false; return; }
+    if (x < SX || x >= SX + SW || y < y0 || y >= y0 + pop_h()) { open_ = false; credits_ = false; return; }
     float cy = close_y();
+    if (credits_) {                                          // BACK returns to the settings
+        if (y >= cy && y < cy + 24 && x >= SX + SW - 10 - 84) credits_ = false;
+        return;
+    }
     if (y >= cy && y < cy + 24 && x >= SX + SW - 10 - 84) { open_ = false; return; }
+    if (y >= cy && y < cy + 24 && x >= SX + 10 && x < SX + 10 + 84) { credits_ = true; return; }
     for (int r = 0; r < NROWS; r++) {
         float ry = row_y(r);
         if (y < ry || y >= ry + ROW_H || x < CTRL_X) continue;

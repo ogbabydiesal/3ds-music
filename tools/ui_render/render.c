@@ -282,22 +282,22 @@ int main(int argc, char **argv) {
     render(OUT("synth-8-reverb-settings.png"), false);
     tap(2, 2);
 
-    // BEADS: OSC -> ENV -> BEADS -> REVERB, frozen texture with pitch down a fifth
+    // GRAINS: OSC -> ENV -> GRAINS -> REVERB, frozen texture with pitch down a fifth
     syn_init();
     syn_delete_node(0); syn_delete_node(1);
     int bo = syn_add_node(NODE_OSC, 24, 30), be = syn_add_node(NODE_ENV, 120, 30);
-    int bb = syn_add_node(NODE_BEADS, 120, 84), br = syn_add_node(NODE_REVERB, 216, 84);
+    int bb = syn_add_node(NODE_GRAINS, 120, 84), br = syn_add_node(NODE_REVERB, 216, 84);
     syn_connect(bo, be); syn_connect(be, bb); syn_connect(bb, br);
     syn_toggle_output(br, 0);
     syn_set_param(bo, OSC_WAVE, WAVE_SAW);
-    syn_set_param(bb, BD_PITCH, -7); syn_set_param(bb, BD_SIZE, 450); syn_set_param(bb, BD_DENSITY, 0.55f);
-    syn_set_param(bb, BD_RANDOM, 0.35f); syn_set_param(bb, BD_FEEDBACK, 0.3f); syn_set_param(bb, BD_FREEZE, 1);
+    syn_set_param(bb, GR_PITCH, -7); syn_set_param(bb, GR_SIZE, 450); syn_set_param(bb, GR_DENSITY, 0.55f);
+    syn_set_param(bb, GR_RANDOM, 0.35f); syn_set_param(bb, GR_FEEDBACK, 0.3f); syn_set_param(bb, GR_FREEZE, 1);
     syn_set_param(br, REV_T60, 4); syn_set_param(br, REV_MIX, 0.35f);
-    tap(BOT_W - 10, 36);                         // carousel > > (shows + BEADS)
+    tap(BOT_W - 10, 36);                         // carousel > > (shows + GRAINS)
     tap(105, 61);                                // % : fit
-    render(OUT("synth-9-beads.png"), false);
+    render(OUT("synth-9-grains.png"), false);
     synth_page_open_popup(bb);
-    render(OUT("synth-10-beads-settings.png"), false);
+    render(OUT("synth-10-grains-settings.png"), false);
     tap(2, 2);
     tap(10, 36); tap(10, 36);                    // carousel back
 
@@ -308,6 +308,8 @@ int main(int argc, char **argv) {
     settings_touch_down(260, 127);               // GYRO  -> ON
     settings_touch_down(260, 153);               // ACCEL -> ON
     render(OUT("settings-2-osc-on.png"), false);
+    settings_touch_down(30 + 10 + 40, (240 - (28 + 6 * 26 + 8 + 24 + 8)) / 2 + 28 + 6 * 26 + 8 + 10);   // CREDITS
+    render(OUT("settings-3-credits.png"), false);
     settings_close();
 
     // SAVE: three slots with different patterns, then the LOAD view

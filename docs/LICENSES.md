@@ -9,17 +9,17 @@ An audit of every algorithm, library and asset in **osc3ds** and **eucseq**, mad
 - **Freeware: yes.** Everything in the apps is the project's own code, a standard published technique, or third-party code under a permissive licence. Ship [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) with the build.
 - **Paid: yes, after a few fixes.** None of the code is copyleft. The open items are about **names and branding**, not code. See [Before a paid release](#before-a-paid-release).
 
-### Can BEADS be used?
+### Can the Beads algorithm be used? (the GRAINS node)
 
-- **The code: yes.** The BEADS node was written for this project from the public Beads *manual*. No Mutable Instruments source code was read or copied. Even if it had been, Beads' firmware is in pichenettes/eurorack, where the STM32 module code is under the **MIT licence**, which allows paid use if its notice is included.
-- **The name: change it before you sell or widely distribute.** The eurorack repository's README says *Mutable Instruments* is a registered trademark. It asks that derivative works not use that name, and recommends not reusing the original module names. Its example renames "Clouds" to "Particle Generator". So the node should get its own name, such as **GRAINS** or **TEXTURE**. A plain factual line like "inspired by Mutable Instruments' Beads" in documentation is ordinary descriptive use. The product and its UI shouldn't carry the name.
+- **The code: yes.** The GRAINS node (first called BEADS) was written for this project from the public Beads *manual*. No Mutable Instruments source code was read or copied. Even if it had been, Beads' firmware is in pichenettes/eurorack, where the STM32 module code is under the **MIT licence**, which allows paid use if its notice is included.
+- **The name: changed to GRAINS.** The eurorack repository's README says *Mutable Instruments* is a registered trademark. It asks that derivative works not use that name, and recommends not reusing the original module names. Its example renames "Clouds" to "Particle Generator". So the node is now called **GRAINS**. The attribution, *"an implementation of the Beads granular algorithm by Emilie Gillet / Mutable Instruments … Not affiliated with Mutable Instruments"*, sits on the **Settings → CREDITS** page and in the docs. That is factual, credit-giving use of the name; the module name isn't used as the product or node name.
 
 ## Algorithms
 
 | Part | Where | Origin | Licence / status | Risk |
 |---|---|---|---|---|
 | **REVERB** (JCRev) | `synth.c` `process_reverb` | Port of STK's `JCRev` (Perry Cook, Gary Scavone), after John Chowning's design and Schroeder's allpass/comb reverberator (1960s) | **STK licence (MIT-style)**: commercial use allowed, **keep the copyright and permission notice**. Included in THIRD_PARTY_NOTICES.md. Any patents on the 1960s designs have long expired. | Low |
-| **BEADS** granular | `synth.c` `process_beads` | Own implementation of granular synthesis (Gabor, Xenakis, Roads), with features modeled on the Beads manual | Own code. Granular synthesis is a decades-old public technique. **"Beads" / "Mutable Instruments" are names to avoid** (see above). | Code: low. Name: **fix before release** |
+| **GRAINS** granular | `synth.c` `process_grains` | Own implementation of granular synthesis (Gabor, Xenakis, Roads), with features modeled on the Beads manual | Own code. Granular synthesis is a decades-old public technique. Renamed from BEADS; Beads is credited, not used as a name. | Low |
 | Oscillators | `synth.c` `process_osc` | Sine, triangle, saw and square formulas; **PolyBLEP** anti-aliasing (Välimäki and colleagues, published around 2007) | Textbook DSP, own implementation. We know of no patent on PolyBLEP. | Low |
 | Custom wavetable | `synth.c` | 16-point linear-interpolated table | Own | None |
 | White noise | `synth.c` `white` | xorshift32 (George Marsaglia, 2003) | Public algorithm | None |
@@ -56,9 +56,9 @@ Tools used only to build (devkitARM GCC, 3dslink, mkbcfnt, makerom, the macOS sc
 
 ## Before a paid release
 
-1. **Rename BEADS** in the UI, docs and saved data, and keep at most a descriptive "inspired by" credit.
+1. ~~Rename BEADS~~ Done: it's **GRAINS**, with attribution on the CREDITS page. Saved slots weren't affected, since nodes are stored by type number.
 2. **Replace the default icon** with your own art (48×48 `icon.png` next to each Makefile).
-3. **Ship THIRD_PARTY_NOTICES.md**, or an About screen with the same text, with every build.
+3. **Ship THIRD_PARTY_NOTICES.md** with every build. `make release` now copies it into `dist/`, and the app's **Settings → CREDITS** page lists the attributions and the STK copyright.
 4. **Add a licence for your own code.** The repo currently has no `LICENSE` file, so all rights are reserved by default, which is fine for selling. Choose a licence if you want others to be able to reuse the source.
 5. **Check the names.** Avoid Nintendo trademarks in a product name ("osc3ds" uses "3DS"), and don't describe the app as official or endorsed. "Runs on Nintendo 3DS homebrew" is a factual description.
 6. **Where to sell.** The 3DS eShop is closed, so homebrew is sold directly, for example on itch.io or Gumroad. Nothing in this code stops that. Running it needs a homebrew-enabled console; describe that requirement plainly.

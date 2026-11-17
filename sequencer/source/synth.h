@@ -14,7 +14,7 @@
 #define SYN_NTRACKS      5
 #define SYN_WT_SIZE      16          // custom wave points
 
-typedef enum { NODE_NOISE, NODE_ENV, NODE_OSC, NODE_REVERB, NODE_BEADS, NODE_CLASS_COUNT } NodeType;
+typedef enum { NODE_NOISE, NODE_ENV, NODE_OSC, NODE_REVERB, NODE_GRAINS, NODE_CLASS_COUNT } NodeType;
 
 typedef enum { PARAM_LINEAR, PARAM_EXP, PARAM_ENUM } ParamKind;
 
@@ -43,7 +43,7 @@ enum { NOISE_TYPE, NOISE_LEVEL };
 enum { ENV_A, ENV_D, ENV_S, ENV_R, ENV_LEN, ENV_LEVEL };
 enum { OSC_WAVE, OSC_FREQ, OSC_PW, OSC_MOD, OSC_LEVEL };
 enum { REV_T60, REV_MIX, REV_LEVEL };
-enum { BD_TIME, BD_SIZE, BD_SHAPE, BD_PITCH, BD_DENSITY, BD_RANDOM, BD_FEEDBACK, BD_MIX, BD_DIR, BD_FREEZE };
+enum { GR_TIME, GR_SIZE, GR_SHAPE, GR_PITCH, GR_DENSITY, GR_RANDOM, GR_FEEDBACK, GR_MIX, GR_DIR, GR_FREEZE };
 enum { WAVE_SINE, WAVE_TRI, WAVE_SAW, WAVE_SQR, WAVE_CUSTOM };
 
 typedef struct {
@@ -58,7 +58,7 @@ typedef struct {
 
     // runtime (audio thread)
     float    out;                   // mono (left for REVERB)
-    float    out_r;                 // right channel (stereo nodes: REVERB, BEADS)
+    float    out_r;                 // right channel (stereo nodes: REVERB, GRAINS)
     uint32_t rng;
     float    pk[3], brown;
     float    phase;

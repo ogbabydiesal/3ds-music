@@ -15,7 +15,7 @@ From top to bottom:
 | Area | What it does |
 |---|---|
 | **Header** | Page name; **SAVE / LOAD / SONG**, where slots store the pattern and this synth patch; and the **settings gear**: OSC output on/off, target IP/port, gyro and accel over OSC. The gear is green while OSC is on. |
-| **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**, **+ REVERB**, **+ BEADS**. Three fit at a time; **<** / **>** scroll to the rest. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. |
+| **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**, **+ REVERB**, **+ GRAINS**. Three fit at a time; **<** / **>** scroll to the rest. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
 | **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. Each node shows its number (e.g. "OSC 4"), which the STEPS page uses when listing what each sequencer drives. |
 | **Bottom bar** | PLAY/STOP, BPM, and the **< >** page arrows. These are the same on every page. |
@@ -89,9 +89,9 @@ The reverb is **stereo**, unlike the other nodes; everything else plays equally 
 | ![REVERB on the canvas](screenshots/synth-7-reverb.png) | ![REVERB settings](screenshots/synth-8-reverb-settings.png) |
 |---|---|
 
-### BEADS: granular texture
+### GRAINS: granular texture
 
-A granular processor modeled on Mutable Instruments' [Beads](https://pichenettes.github.io/mutable-instruments-documentation/modules/beads/). This is a new implementation written for this synth, not a port of the module's firmware. Its input is recorded continuously into an **8-second buffer**. Up to **16 grains** play short slices of that recording back, each with its own pitch, direction, envelope and stereo position.
+An implementation of the granular algorithm of Mutable Instruments' [Beads](https://pichenettes.github.io/mutable-instruments-documentation/modules/beads/). This is a new implementation written for this synth, not a port of the module's firmware. Its input is recorded continuously into an **8-second buffer**. Up to **16 grains** play short slices of that recording back, each with its own pitch, direction, envelope and stereo position.
 
 | Setting | Range | Like Beads' | Notes |
 |---|---|---|---|
@@ -106,15 +106,17 @@ A granular processor modeled on Mutable Instruments' [Beads](https://pichenettes
 | DIR | FWD / REV / BOTH | SIZE turned left | Grains play forward, reversed, or randomly either way. |
 | FREEZE | OFF / ON | FREEZE | Stops recording, so the grains keep playing the audio already in the buffer. |
 
-**Shape pulses seed grains.** Every pulse of a shape that this BEADS feeds starts one grain, like Beads' SEED button. Set DENSITY to 0 to get one grain per pulse, or leave DENSITY up to add pulse grains on top of the stream.
+**Shape pulses seed grains.** Every pulse of a shape that this GRAINS feeds starts one grain, like Beads' SEED button. Set DENSITY to 0 to get one grain per pulse, or leave DENSITY up to add pulse grains on top of the stream.
 
 **Input = AUDIO**, and the output is **stereo**. The buffer starts empty, so play something into it first. With nothing plugged in it stays silent; Beads' built-in wavetable mode isn't included.
 
 Try **FREEZE** from a step sequencer: put FREEZE on an S box, with MIN 0 and MAX 1 and the sliders at the top or bottom. The texture then holds or follows the input in rhythm.
 
-**What's left out:** Beads' built-in reverb (patch BEADS into a **REVERB** node instead), the three quality modes, delay mode, wavetable mode and per-parameter randomization. The settings box rows are slimmer for BEADS so that all ten settings fit.
+The algorithm is credited in **Settings → CREDITS** on the 3DS.
 
-| ![BEADS in a patch](screenshots/synth-9-beads.png) | ![BEADS settings](screenshots/synth-10-beads-settings.png) |
+**What's left out:** Beads' built-in reverb (patch GRAINS into a **REVERB** node instead), the three quality modes, delay mode, wavetable mode and per-parameter randomization. The settings box rows are slimmer for GRAINS so that all ten settings fit.
+
+| ![GRAINS in a patch](screenshots/synth-9-grains.png) | ![GRAINS settings](screenshots/synth-10-grains-settings.png) |
 |---|---|
 
 ## Settings box and OUTPUT
@@ -173,7 +175,7 @@ Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** p
 
 ## Sound output
 
-- Audio is 32 kHz stereo through the 3DS speakers and headphone jack. Only REVERB and BEADS add stereo width; every other node is centred.
+- Audio is 32 kHz stereo through the 3DS speakers and headphone jack. Only REVERB and GRAINS add stereo width; every other node is centred.
 - **It needs the DSP firmware file `sdmc:/3ds/dspfirm.cdc`.** Create it once by running the **DSP1** homebrew on your 3DS. Without it, the canvas shows "NO AUDIO: needs sdmc:/3ds/dspfirm.cdc" and everything else, including OSC, still works.
 - **Azahar:** copy the same file to `~/Library/Application Support/Azahar/sdmc/3ds/`.
 - Sound can land up to about 30 ms after the visual pulse, because of audio buffering. The OSC messages are sent on time.
@@ -191,5 +193,5 @@ Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** p
 | Pad-ish drone hit | OSC → ENV | CUST wave, 110 Hz; ENV A 300 ms, LENGTH 800 ms, R 1.5 s |
 | Big snare / clap room | NOISE → ENV → REVERB | PINK, ENV D 90 ms; REVERB T60 1.2 s, MIX 35% |
 | Ambient pluck | OSC → ENV → REVERB | TRI 330 Hz, ENV D 200 ms; REVERB T60 6 s, MIX 60% |
-| Granular cloud | OSC → ENV → BEADS → REVERB | SAW 220 Hz; BEADS SIZE 450 ms, DENSITY +55%, RANDOM 35%, PITCH −7 st, FEEDBACK 30%; REVERB T60 4 s |
-| Stutter hits | NOISE → ENV → BEADS | BEADS DENSITY 0 (one grain per pulse), SIZE 60 ms, SHAPE 0%, TIME 10% |
+| Granular cloud | OSC → ENV → GRAINS → REVERB | SAW 220 Hz; GRAINS SIZE 450 ms, DENSITY +55%, RANDOM 35%, PITCH −7 st, FEEDBACK 30%; REVERB T60 4 s |
+| Stutter hits | NOISE → ENV → GRAINS | GRAINS DENSITY 0 (one grain per pulse), SIZE 60 ms, SHAPE 0%, TIME 10% |
