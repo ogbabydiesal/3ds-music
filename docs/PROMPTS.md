@@ -72,6 +72,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 50 | 00:15 | ~2 min | *(button)* Card is in |
 | 51 | 00:20 | 0.1 min | *(button)* Leave as is |
 | 52 | 00:25 | ~9 min | let's continue with getting this to itch *(then answered: nodeTrix only; MIT licence; pay what you want, min $5)* |
+| 53 | 00:40 | ~2 min | *(button)* Publish v0.4.0 |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -109,3 +110,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
 20. **eucseq → nodeTrix**: renamed the app (home-menu title, `nodeTrix.3dsx`, release files, docs) and the GitHub repo. Saves moved to `sdmc:/3ds/nodeTrix/`; old slots and settings are carried over automatically on first launch. (Entries above keep the old name, as it was then.)
 21. **Save migration fix**: old slots didn't appear on the 3DS after the rename. Moving the whole folder wasn't reliable, so the app now copies each old slot and song file into `sdmc:/3ds/nodeTrix/slots/` if it isn't there yet. It never overwrites, and the old files stay. Tested on the Mac with a copy of real saves.
 22. **itch.io kit**: MIT `LICENSE`, a disclaimer and privacy note in the README, `make itch` (a zip with nodeTrix.3dsx, INSTALL.txt, LICENSE and the notices), a 630×500 cover image from the icon generator, and [docs/itch/PAGE.md](itch/PAGE.md) with the page text, field values, screenshots and the payment/tax setup steps.
+23. **Release v0.4.0**: the first release named nodeTrix, with the new icon, save migration, GRAINS and CREDITS, under the MIT licence.
