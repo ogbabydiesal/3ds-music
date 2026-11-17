@@ -7,7 +7,7 @@ Everything in this repo was written in one conversation with an AI coding agent.
 | **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
 | **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
 | **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 11:55 (US Eastern), about 34 hours of calendar time, most of it the author away or testing |
-| **Claude's working time** | **about 1 hour 55 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
+| **Claude's working time** | **about 2 hours 5 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
 | **Prompts** | 27 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
 
 **About the working time:** it's measured from the session transcript timestamps, from each prompt to the end of Claude's reply. It includes thinking, writing code and waiting on tools such as compiles and installs. Reasoning time can't be separated out, because the transcript doesn't record it. The three biggest turns were the first sequencer (~8 min), the synth page (~6.6 min), and oscillators with zoom, box select and copy/paste (~4.7 min).
@@ -64,6 +64,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 42 | 22:25 | 0.1 min | *(button)* Looks good |
 | 43 | 23:12 | ~3 min | *(button)* Publish v0.3.0 |
 | 44 | 23:20 | ~1 min | what steps would i need to make my app compliant to sell on itch? what other app stores exist for something like this? |
+| 45 | 23:27 | ~5 min | start by making an icon that references the white circle, maybe a red cube, yellow sphere, and blue cylinder |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -97,3 +98,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
 16. **Licence audit**: [docs/LICENSES.md](LICENSES.md) covers every algorithm, library and asset, plus THIRD_PARTY_NOTICES.md with the STK licence for the JCRev port. It found that the BEADS *name* (a Mutable Instruments trademark) and the default devkitPro icon should change before a paid release, and checked that release builds contain no Arial.
 17. **GRAINS + CREDITS**: renamed the BEADS node to GRAINS. Added a CREDITS page in Settings that credits the Beads algorithm (Emilie Gillet / Mutable Instruments, not affiliated), STK's JCRev with its copyright, Kellett's pink noise and the libraries. `make release` now ships THIRD_PARTY_NOTICES.md.
 18. **Release v0.3.0**: S1–S8 step sequencers, REVERB, GRAINS, stereo audio and the CREDITS page, published with the `.3dsx` files and THIRD_PARTY_NOTICES.md.
+19. **eucseq icon**: a 48×48 SMDH icon with the white ring, a red wireframe cube, a yellow sphere, a blue cylinder and the white star. It's drawn by a CoreGraphics generator in `tools/icon`, with gaps in the ring under each shape, and replaces the default devkitPro logo.

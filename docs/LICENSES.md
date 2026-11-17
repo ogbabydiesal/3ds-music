@@ -49,7 +49,7 @@ Tools used only to build (devkitARM GCC, 3dslink, mkbcfnt, makerom, the macOS sc
 |---|---|
 | **Arial** (`sequencer/romfs/arial.bcfnt`) | Monotype's font, licensed with macOS. **It must not be redistributed.** It's git-ignored, and `make release` leaves it out. The release `.3dsx` files were checked and contain no font. Only your own `make` / `make send` builds include it. |
 | 3DS system font | Read from the console at runtime and never shipped. Fine. |
-| **App icon** | Both apps use **libctru's `default_icon.png`**, the devkitPro logo. **Replace it with your own `icon.png`** before release. |
+| **App icon** | **eucseq:** its own icon, the white ring with a red cube, a yellow sphere, a blue cylinder and the star, drawn by `tools/icon` and saved as `sequencer/icon.png`. **osc3ds** still uses libctru's `default_icon.png` (the devkitPro logo); replace it before selling osc3ds. |
 | `dspfirm.cdc` | Nintendo's DSP firmware. It's never shipped: each user dumps their own with DSP1. Keep it that way. |
 | Screenshots in `docs/` | Rendered from this app's UI. Text drawn with a font in an image is normal use of the font. |
 | Max patch, Python OSC monitor | Own. The monitor uses only Python's standard library. |
@@ -57,7 +57,7 @@ Tools used only to build (devkitARM GCC, 3dslink, mkbcfnt, makerom, the macOS sc
 ## Before a paid release
 
 1. ~~Rename BEADS~~ Done: it's **GRAINS**, with attribution on the CREDITS page. Saved slots weren't affected, since nodes are stored by type number.
-2. **Replace the default icon** with your own art (48×48 `icon.png` next to each Makefile).
+2. **Icons:** eucseq is done. osc3ds still needs its own 48×48 `icon.png` next to the root Makefile.
 3. **Ship THIRD_PARTY_NOTICES.md** with every build. `make release` now copies it into `dist/`, and the app's **Settings → CREDITS** page lists the attributions and the STK copyright.
 4. **Add a licence for your own code.** The repo currently has no `LICENSE` file, so all rights are reserved by default, which is fine for selling. Choose a licence if you want others to be able to reuse the source.
 5. **Check the names.** Avoid Nintendo trademarks in a product name ("osc3ds" uses "3DS"), and don't describe the app as official or endorsed. "Runs on Nintendo 3DS homebrew" is a factual description.
