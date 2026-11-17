@@ -55,6 +55,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 33 | 11:49 | ~6 min | almost, i don't need a separate step sequencer for every parameter, i want let's say 8 step sequencers, and i want to assign them in the actual instrument panel, it's up to me to set the appropriate numerical range |
 | 34 | 12:05 | 0.3 min | what controls do i use to control the emulator? |
 | 35 | 12:10 | 0.5 min | why do i get no sound? |
+| 36 | 12:12 | 0.1 min | *(button)* Yes, on the 3DS |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
