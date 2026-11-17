@@ -40,7 +40,7 @@ static bool write_slot(int slot, const Pattern *p, const SynNode *nodes) {
     slot_path(slot, path, sizeof path);
     FILE *f = fopen(path, "w");
     if (!f) return false;
-    fprintf(f, "eucseq-slot 1\nbpm %d\n", p->bpm);
+    fprintf(f, "eucseq-slot 2\nbpm %d\n", p->bpm);      // v2: 10 params per node (v1 had 8)
     for (int t = 0; t < PAT_NTRACKS; t++)
         fprintf(f, "track %d %d %d %d %d\n", t, p->tr[t].divs, p->tr[t].pulses, p->tr[t].rot, p->tr[t].mute);
     for (int i = 0; i < SYN_MAX_NODES; i++) {
@@ -74,9 +74,13 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
     if (seqs) mod_defaults(seqs);                      // older saves have no step sequencers
     char line[1024];
     bool ok = false;
+    int np = 8;                                         // params per node line: 8 in v1 files
     while (fgets(line, sizeof line, f)) {
         int a, b, c, d, e;
-        if (!strncmp(line, "eucseq-slot", 11)) ok = true;
+        if (!strncmp(line, "eucseq-slot", 11)) {
+            ok = true;
+            if (sscanf(line, "eucseq-slot %d", &a) == 1 && a >= 2) np = SYN_MAX_PARAMS;
+        }
         else if (sscanf(line, "bpm %d", &a) == 1) p->bpm = a < 20 ? 20 : a > 300 ? 300 : a;
         else if (sscanf(line, "track %d %d %d %d %d", &a, &b, &c, &d, &e) == 5 && a >= 0 && a < PAT_NTRACKS) {
             p->tr[a].divs = b < 0 ? 0 : b > 32 ? 32 : b;
@@ -98,7 +102,7 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             float v[6 + SYN_MAX_PARAMS + SYN_WT_SIZE + SYN_MAX_PARAMS];
             int nv = 0;
             while (tok && nv < (int)(sizeof v / sizeof v[0])) { v[nv++] = strtof(tok, NULL); tok = strtok(NULL, " \n"); }
-            if (nv < 6 + SYN_MAX_PARAMS) continue;
+            if (nv < 6 + np) continue;
             int i = (int)v[0];
             if (i < 0 || i >= SYN_MAX_NODES) continue;
             SynNode *n = &nodes[i];
@@ -107,10 +111,12 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             n->x = v[2]; n->y = v[3];
             n->input = (int)v[4];
             n->outputs = (uint8_t)(int)v[5];
-            for (int k = 0; k < SYN_MAX_PARAMS; k++) n->p[k] = v[6 + k];
-            for (int k = 0; k < SYN_WT_SIZE && 6 + SYN_MAX_PARAMS + k < nv; k++) n->wt[k] = v[6 + SYN_MAX_PARAMS + k];
-            int ms = 6 + SYN_MAX_PARAMS + SYN_WT_SIZE;      // S1..S8 assignments (absent in older saves)
-            for (int k = 0; k < SYN_MAX_PARAMS; k++) n->mod_src[k] = ms + k < nv ? (int8_t)(int)v[ms + k] : -1;
+            const NodeClass *cls = n->type >= 0 && n->type < NODE_CLASS_COUNT ? &syn_classes[n->type] : NULL;
+            for (int k = 0; k < SYN_MAX_PARAMS; k++)
+                n->p[k] = k < np ? v[6 + k] : (cls && k < cls->nparams ? cls->params[k].def : 0);
+            for (int k = 0; k < SYN_WT_SIZE && 6 + np + k < nv; k++) n->wt[k] = v[6 + np + k];
+            int ms = 6 + np + SYN_WT_SIZE;                  // S1..S8 assignments (absent in older saves)
+            for (int k = 0; k < SYN_MAX_PARAMS; k++) n->mod_src[k] = k < np && ms + k < nv ? (int8_t)(int)v[ms + k] : -1;
         }
     }
     fclose(f);

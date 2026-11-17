@@ -1,6 +1,7 @@
 #include "synth.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef __3DS__
@@ -17,6 +18,8 @@ static LightLock graph_lock;
 
 static const char *const noise_types[] = { "WHITE", "PINK", "BROWN" };
 static const char *const wave_types[]  = { "SINE", "TRI", "SAW", "SQR", "CUST" };
+static const char *const dir_types[]   = { "FWD", "REV", "BOTH" };
+static const char *const off_on[]      = { "OFF", "ON" };
 
 const NodeClass syn_classes[NODE_CLASS_COUNT] = {
     [NODE_NOISE] = {
@@ -51,11 +54,28 @@ const NodeClass syn_classes[NODE_CLASS_COUNT] = {
     [NODE_REVERB] = {
         // John Chowning's reverb as in STK's JCRev: 3 series allpasses, 4 parallel
         // damped combs, two output delays for stereo. T60 = decay time to -60 dB.
-        .name = "REVERB", .has_input = true, .input_name = "AUDIO", .nparams = 3,
+        .name = "REVERB", .has_input = true, .input_name = "AUDIO", .stereo = true, .nparams = 3,
         .params = {
             { "T60",   PARAM_EXP,    0.1f, 20, 1.0f, "s" },
             { "MIX",   PARAM_LINEAR, 0,    1,  0.3f, "%" },
             { "LEVEL", PARAM_LINEAR, 0,    1,  1.0f, "%" },
+        },
+    },
+    [NODE_BEADS] = {
+        // Granular texture processor after Mutable Instruments Beads: the input is
+        // recorded into an 8 s buffer and replayed by up to 16 grains.
+        .name = "BEADS", .has_input = true, .input_name = "AUDIO", .stereo = true, .nparams = 10,
+        .params = {
+            { "TIME",     PARAM_LINEAR, 0,   1,    0.2f, "%"  },   // 0 newest .. 1 oldest audio
+            { "SIZE",     PARAM_EXP,    10,  4000, 120,  "ms" },
+            { "SHAPE",    PARAM_LINEAR, 0,   1,    0.5f, "%"  },   // 0 clicky, .5 smooth, 1 slow attack
+            { "PITCH",    PARAM_LINEAR, -24, 24,   0,    "st" },
+            { "DENSITY",  PARAM_LINEAR, -1,  1,    0.5f, "%"  },   // <0 regular, 0 seeds only, >0 random
+            { "RANDOM",   PARAM_LINEAR, 0,   1,    0.2f, "%"  },
+            { "FEEDBACK", PARAM_LINEAR, 0,   1,    0,    "%"  },
+            { "MIX",      PARAM_LINEAR, 0,   1,    0.6f, "%"  },
+            { "DIR",      PARAM_ENUM,   0,   2,    0,    "",   dir_types, 3 },
+            { "FREEZE",   PARAM_ENUM,   0,   1,    0,    "",   off_on, 2 },
         },
     },
 };
@@ -94,6 +114,41 @@ static void jc_lengths(void) {
 }
 
 static void jc_clear(int i) { memset(&jc[i], 0, sizeof jc[i]); }
+
+// ------------------------------------------------------------- BEADS state ---
+#define BD_BUF      (SYN_SAMPLE_RATE * 8)       // 8 s recording buffer per node
+#define BD_GRAINS   16
+
+typedef struct {
+    bool  on;
+    float pos, step;            // read position (samples into the buffer) and increment
+    float t, dt;                // envelope phase 0..1 and its increment
+    float shape;                // envelope shape when the grain started
+    float gl, gr;               // pan gains
+} Grain;
+
+typedef struct {
+    int16_t *buf;               // malloc'd while the node exists (NULL if out of memory)
+    int      w;                 // write head
+    int      filled;            // samples recorded so far (up to BD_BUF)
+    Grain    g[BD_GRAINS];
+    float    until_next;        // samples to the next automatic grain
+    float    fb;                // last wet output (mono) for feedback
+    float    norm;              // smoothed active-grain count
+    uint32_t rng;
+    bool     seed;              // a shape pulse asked for a grain
+} BeadsState;
+static BeadsState bd[SYN_MAX_NODES];
+
+static void bd_alloc(int i) {
+    if (!bd[i].buf) bd[i].buf = (int16_t *)calloc(BD_BUF, sizeof(int16_t));
+    else memset(bd[i].buf, 0, BD_BUF * sizeof(int16_t));
+    int16_t *b = bd[i].buf;
+    memset(&bd[i], 0, sizeof bd[i]);
+    bd[i].buf = b;
+    bd[i].rng = 0x2545F491u * (uint32_t)(i + 7);
+}
+static void bd_free(int i) { free(bd[i].buf); memset(&bd[i], 0, sizeof bd[i]); }
 
 SynNode syn_nodes[SYN_MAX_NODES];
 static int order[SYN_MAX_NODES], norder = 0;    // evaluation order (inputs first)
@@ -146,6 +201,7 @@ static int add_node_locked(NodeType type, float x, float y) {
         memset(n->mod_src, -1, sizeof n->mod_src);
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
         jc_clear(i);
+        if (type == NODE_BEADS) bd_alloc(i); else bd_free(i);
         const NodeClass *c = &syn_classes[type];
         for (int k = 0; k < c->nparams; k++) n->p[k] = c->params[k].def;
         for (int k = 0; k < SYN_WT_SIZE; k++)        // default custom wave: a lopsided bump
@@ -179,6 +235,7 @@ int syn_add_copy(const SynNode *src, float x, float y) {
 void syn_delete_node(int i) {
     GRAPH_LOCK();
     syn_nodes[i].used = false;
+    bd_free(i);
     for (int j = 0; j < SYN_MAX_NODES; j++)
         if (syn_nodes[j].input == i) syn_nodes[j].input = -1;
     rebuild();
@@ -251,6 +308,8 @@ void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
     for (int i = 0; i < SYN_MAX_NODES; i++) {
         SynNode *n = &syn_nodes[i];
         memset(n, 0, sizeof *n);
+        bool want_beads = src[i].used && src[i].type == NODE_BEADS;
+        if (want_beads) bd_alloc(i); else bd_free(i);
         if (!src[i].used || src[i].type < 0 || src[i].type >= NODE_CLASS_COUNT) continue;
         n->used = true;
         n->type = src[i].type;
@@ -438,6 +497,135 @@ static inline void process_reverb(SynNode *n, int idx, float input) {
     n->out_r = (mix * wet[1] + dry) * lvl;
 }
 
+// ------------------------------------------------------------------ BEADS ---
+
+static inline float bd_rand(BeadsState *s) {           // 0..1
+    uint32_t x = s->rng;
+    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    s->rng = x;
+    return (x >> 8) * (1.0f / 16777216.0f);
+}
+
+// Envelope by SHAPE: 0 = rectangle with tiny fades (clicky), .5 = triangle,
+// 1 = slow attack and a short release.
+static inline float bd_env(float t, float shape) {
+    if (shape < 0.5f) {
+        float f = shape;
+        if (f < 0.004f) f = 0.004f;
+        float a = t / f, b = (1.0f - t) / f;
+        float e = a < b ? a : b;
+        return e > 1.0f ? 1.0f : e;
+    }
+    float a = shape;                                    // attack fraction .5 .. .97
+    if (a > 0.97f) a = 0.97f;
+    return t < a ? t / a : (1.0f - t) / (1.0f - a);
+}
+
+static void bd_start_grain(SynNode *n, BeadsState *s) {
+    Grain *g = NULL;
+    for (int i = 0; i < BD_GRAINS; i++) if (!s->g[i].on) { g = &s->g[i]; break; }
+    if (!g || s->filled < SYN_SAMPLE_RATE / 100) return;  // all busy, or nothing recorded yet
+    float rnd = n->p[BD_RANDOM], r2 = rnd * rnd;
+
+    float semis = n->p[BD_PITCH] + (bd_rand(s) * 2 - 1) * 12.0f * r2;
+    float ratio = exp2f(semis / 12.0f);
+    float len = n->p[BD_SIZE] * 0.001f * SYN_SAMPLE_RATE * exp2f((bd_rand(s) * 2 - 1) * rnd);
+    if (len < 64) len = 64;
+    int dir = (int)n->p[BD_DIR];
+    bool rev = dir == 1 || (dir == 2 && bd_rand(s) < 0.5f);
+    float travel = len * ratio;                          // samples the read head covers
+
+    // TIME: how far back the grain starts. Keep the whole grain inside recorded
+    // audio and, while recording, behind the write head.
+    bool frozen = n->p[BD_FREEZE] >= 0.5f;
+    float avail = (float)s->filled - 2;
+    float time = n->p[BD_TIME] + (bd_rand(s) * 2 - 1) * 0.25f * rnd;
+    time = time < 0 ? 0 : time > 1 ? 1 : time;
+    float lo, hi;                                        // allowed start delays (samples back)
+    if (rev) { lo = 1; hi = avail - travel; }
+    else {
+        lo = frozen ? travel : (travel > len ? travel - len : 0) + 32;
+        hi = avail;
+        if (lo > avail) lo = avail;
+    }
+    if (hi < lo) hi = lo;
+    float delay = lo + time * (hi - lo);
+    if (travel > avail) { travel = avail; len = travel / ratio; }
+
+    float p = (float)s->w - delay;
+    while (p < 0) p += BD_BUF;
+    g->pos = p;
+    g->step = rev ? -ratio : ratio;
+    g->t = 0;
+    g->dt = 1.0f / len;
+    g->shape = n->p[BD_SHAPE];
+    float spread = rnd > 0.5f ? 1.0f : rnd * 2;          // random pan, wider with RANDOM
+    if (n->p[BD_DENSITY] > 0.02f && spread < 0.5f) spread = 0.5f;   // random rate: Beads pans too
+    float pan = 0.5f + (bd_rand(s) - 0.5f) * spread;
+    g->gl = cosf(pan * 1.5707963f) * 1.41421356f * 0.7071f;
+    g->gr = sinf(pan * 1.5707963f) * 1.41421356f * 0.7071f;
+    g->on = true;
+}
+
+static inline void process_beads(SynNode *n, int idx, float input) {
+    BeadsState *s = &bd[idx];
+    if (!s->buf) { n->out = n->out_r = input; return; }
+
+    // record (input + feedback, softly limited) unless frozen
+    if (n->p[BD_FREEZE] < 0.5f) {
+        float fbk = n->p[BD_FEEDBACK];
+        if (fbk > 0.95f) fbk = 0.95f;
+        float x = input + fbk * s->fb;
+        x = x / (1.0f + fabsf(x) * 0.5f) * 1.5f;          // soft limiter: |x| < 3 -> < 1.8
+        if (x > 1) x = 1;
+        if (x < -1) x = -1;
+        s->buf[s->w] = (int16_t)(x * 32767.0f);
+        if (++s->w >= BD_BUF) s->w = 0;
+        if (s->filled < BD_BUF) s->filled++;
+    }
+
+    // grain scheduler: DENSITY < 0 regular, > 0 random, ~0 only shape pulses (seeds)
+    float d = n->p[BD_DENSITY], ad = fabsf(d);
+    if (s->seed) { s->seed = false; bd_start_grain(n, s); }
+    if (ad > 0.02f) {
+        float rate = 0.5f * exp2f((ad - 0.02f) / 0.98f * 8.0f);   // 0.5 .. 128 grains/s
+        if (--s->until_next <= 0) {
+            bd_start_grain(n, s);
+            float mean = SYN_SAMPLE_RATE / rate;
+            s->until_next = d < 0 ? mean : -mean * logf(1.0f - bd_rand(s) * 0.999f);
+        }
+    }
+
+    // play grains
+    float l = 0, r = 0;
+    int active = 0;
+    for (int i = 0; i < BD_GRAINS; i++) {
+        Grain *g = &s->g[i];
+        if (!g->on) continue;
+        active++;
+        int i0 = (int)g->pos;
+        float fr = g->pos - i0;
+        int i1 = i0 + 1 >= BD_BUF ? 0 : i0 + 1;
+        float v = (s->buf[i0] + (s->buf[i1] - s->buf[i0]) * fr) * (1.0f / 32767.0f);
+        v *= bd_env(g->t, g->shape);
+        l += v * g->gl;
+        r += v * g->gr;
+        g->pos += g->step;
+        if (g->pos >= BD_BUF) g->pos -= BD_BUF;
+        if (g->pos < 0) g->pos += BD_BUF;
+        g->t += g->dt;
+        if (g->t >= 1.0f) g->on = false;
+    }
+    s->norm += 0.0005f * ((float)active - s->norm);       // overlapping grains: keep the level steady
+    float gain = 1.0f / sqrtf(s->norm > 1 ? s->norm : 1);
+    l *= gain; r *= gain;
+    s->fb = 0.5f * (l + r);
+
+    float mix = n->p[BD_MIX], dry = (1.0f - mix) * input;
+    n->out   = mix * l + dry;
+    n->out_r = mix * r + dry;
+}
+
 void syn_render(int16_t *out, int nframes) {
     GRAPH_LOCK();
     uint32_t trig = __atomic_exchange_n(&pending_triggers, 0, __ATOMIC_SEQ_CST);
@@ -445,6 +633,7 @@ void syn_render(int16_t *out, int nframes) {
         for (int i = 0; i < SYN_MAX_NODES; i++) {
             SynNode *n = &syn_nodes[i];
             if (n->used && n->type == NODE_ENV && (n->trig_mask & trig)) env_gate(n);
+            if (n->used && n->type == NODE_BEADS && (n->trig_mask & trig)) bd[i].seed = true;
         }
 
     for (int s = 0; s < nframes; s++) {
@@ -453,18 +642,19 @@ void syn_render(int16_t *out, int nframes) {
             SynNode *n = &syn_nodes[order[o]];
             bool has_in = n->input >= 0;
             float in = has_in ? syn_nodes[n->input].out : 0.0f;
-            if (has_in && syn_nodes[n->input].type == NODE_REVERB)     // stereo source: use the mid
+            if (has_in && syn_classes[syn_nodes[n->input].type].stereo)  // stereo source: use the mid
                 in = 0.5f * (in + syn_nodes[n->input].out_r);
             switch (n->type) {
             case NODE_NOISE: n->out = process_noise(n); break;
             case NODE_ENV:   n->out = process_env(n, has_in ? in : 1.0f); break;   // alone: its contour
             case NODE_OSC:   n->out = process_osc(n, in, has_in); break;
             case NODE_REVERB: process_reverb(n, order[o], in); break;
+            case NODE_BEADS:  process_beads(n, order[o], in); break;
             default:         n->out = 0;
             }
             if (n->outputs) {
                 mix += n->out;
-                mix_r += n->type == NODE_REVERB ? n->out_r : n->out;
+                mix_r += syn_classes[n->type].stereo ? n->out_r : n->out;
             }
         }
         float ch[2] = { mix * 0.9f, mix_r * 0.9f };

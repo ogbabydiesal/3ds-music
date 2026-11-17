@@ -208,12 +208,14 @@ static bool has_wave_editor(int node) {
     return n->type == NODE_OSC && (int)n->p[OSC_WAVE] == WAVE_CUSTOM;
 }
 static float extra_h(int node) { return has_wave_editor(node) ? WAVE_ED_H + 4 : 0; }
+// Parameter row height: compact for classes with many settings (BEADS) so the box fits.
+static float prow_h(int node) { return syn_classes[syn_nodes[node].type].nparams > 7 ? 14 : POP_ROW_H; }
 static float popup_h(int node) {
     int n = syn_classes[syn_nodes[node].type].nparams;
-    return POP_TITLE_H + n * POP_ROW_H + extra_h(node) + 6 + POP_ROW_H + 11 + 24 + 8;
+    return POP_TITLE_H + n * prow_h(node) + extra_h(node) + 6 + POP_ROW_H + 11 + 24 + 8;
 }
 static float popup_y(int node) { float y = (240 - popup_h(node)) / 2; return y < 0 ? 0 : y; }
-static float row_y(int node, int k) { return popup_y(node) + POP_TITLE_H + k * POP_ROW_H; }
+static float row_y(int node, int k) { return popup_y(node) + POP_TITLE_H + k * prow_h(node); }
 static float wave_y(int node) { return row_y(node, syn_classes[syn_nodes[node].type].nparams) + 2; }
 static float out_y(int node) { return row_y(node, syn_classes[syn_nodes[node].type].nparams) + extra_h(node) + 6; }
 static float buttons_y(int node) { return out_y(node) + POP_ROW_H + 11; }
@@ -259,7 +261,7 @@ static void popup_touch_down(int x, int y) {
     const NodeClass *c = &syn_classes[syn_nodes[node].type];
     for (int k = 0; k < c->nparams; k++) {
         float ry = row_y(node, k);
-        if (y < ry || y >= ry + POP_ROW_H) continue;
+        if (y < ry || y >= ry + prow_h(node)) continue;
         if (x >= POP_SRC_X - 2) {                          // cycle: none, S1..S8, none
             int cur = syn_nodes[node].mod_src[k];
             syn_set_mod_src(node, k, cur + 1 >= MOD_SEQS ? -1 : cur + 1);
@@ -293,6 +295,7 @@ static void popup_touch_down(int x, int y) {
 
 static void format_value(const ParamDef *d, float v, char *out, size_t n) {
     if (d->unit[0] == '%') snprintf(out, n, "%d%%", (int)lroundf(v * 100));
+    else if (!strcmp(d->unit, "st")) snprintf(out, n, "%+.1f st", v);
     else if (v < 10) snprintf(out, n, "%.1f %s", v, d->unit);
     else snprintf(out, n, "%d %s", (int)lroundf(v), d->unit);
 }
@@ -311,35 +314,37 @@ void synth_page_draw_popup(void) {
     text(POP_X + 8, py + 5, 0.5f, COL_FG, 0, "%s %d", c->name, node + 1);
     if (c->has_input) text(POP_X + POP_W - 8, py + 7, 0.36f, COL_DIM, C2D_AlignRight, "input: %s", c->input_name);
 
+    float rh = prow_h(node), ty = rh < POP_ROW_H ? 1 : 3, ns = rh < POP_ROW_H ? 0.37f : 0.4f;
     for (int k = 0; k < c->nparams; k++) {
         const ParamDef *d = &c->params[k];
         float ry = row_y(node, k);
-        text(POP_X + 8, ry + 3, 0.4f, COL_DIM, 0, "%s", d->name);
+        text(POP_X + 8, ry + ty, ns, COL_DIM, 0, "%s", d->name);
         int src = n->mod_src[k];
         if (d->kind == PARAM_ENUM) {
             float sw = POP_ENUM_W / (float)d->nlabels;
             for (int s = 0; s < d->nlabels; s++) {
                 bool on = (int)n->p[k] == (int)d->min + s;
                 float bx = POP_BAR_X + s * sw;
-                C2D_DrawRectSolid(bx + 1, ry + 2, 0.5f, sw - 2, POP_ROW_H - 4, on ? COL_ACCENT : COL_BTN);
-                text(bx + sw / 2, ry + 4, 0.34f, COL_FG, C2D_AlignCenter, "%s", d->labels[s]);
+                C2D_DrawRectSolid(bx + 1, ry + 1, 0.5f, sw - 2, rh - 2, on ? COL_ACCENT : COL_BTN);
+                text(bx + sw / 2, ry + ty + 1, 0.34f, COL_FG, C2D_AlignCenter, "%s", d->labels[s]);
             }
         } else {
             float u = syn_param_to_norm(d, n->p[k]);
             if (u < 0) u = 0;
             if (u > 1) u = 1;
-            C2D_DrawRectSolid(POP_BAR_X, ry + 6, 0.5f, POP_BAR_W, 7, COL_BTN);
-            C2D_DrawRectSolid(POP_BAR_X, ry + 6, 0.5f, POP_BAR_W * u, 7, COL_ACCENT);
+            float by = ry + (rh - 7) / 2;
+            C2D_DrawRectSolid(POP_BAR_X, by, 0.5f, POP_BAR_W, 7, COL_BTN);
+            C2D_DrawRectSolid(POP_BAR_X, by, 0.5f, POP_BAR_W * u, 7, COL_ACCENT);
             char v[24];
             format_value(d, n->p[k], v, sizeof v);
-            text(POP_SRC_X - 5, ry + 3, 0.4f, src >= 0 ? COL_ACCENT : COL_FG, C2D_AlignRight, "%s", v);
+            text(POP_SRC_X - 5, ry + ty, ns, src >= 0 ? COL_ACCENT : COL_FG, C2D_AlignRight, "%s", v);
         }
         // Step sequencer driving this parameter (tap to cycle -, S1..S8)
-        C2D_DrawRectSolid(POP_SRC_X, ry + 2, 0.5f, POP_SRC_W, POP_ROW_H - 4,
+        C2D_DrawRectSolid(POP_SRC_X, ry + 1, 0.5f, POP_SRC_W, rh - 2,
                           src >= 0 ? track_color(mod_seqs[src].trig, 0, false) : C2D_Color32(24, 29, 35, 255));
-        rect_outline(POP_SRC_X, ry + 2, POP_SRC_W, POP_ROW_H - 4, COL_LINE);
-        if (src >= 0) text(POP_SRC_X + POP_SRC_W / 2.0f, ry + 3, 0.34f, C2D_Color32(10, 12, 16, 255), C2D_AlignCenter, "S%d", src + 1);
-        else text(POP_SRC_X + POP_SRC_W / 2.0f, ry + 3, 0.34f, COL_DIM, C2D_AlignCenter, "S");
+        rect_outline(POP_SRC_X, ry + 1, POP_SRC_W, rh - 2, COL_LINE);
+        if (src >= 0) text(POP_SRC_X + POP_SRC_W / 2.0f, ry + ty, 0.34f, C2D_Color32(10, 12, 16, 255), C2D_AlignCenter, "S%d", src + 1);
+        else text(POP_SRC_X + POP_SRC_W / 2.0f, ry + ty, 0.34f, COL_DIM, C2D_AlignCenter, "S");
     }
 
     // Custom waveform editor: 16 bars, draw with the stylus
@@ -411,8 +416,8 @@ static void toolbar_touch_down(int x) {
     }
 }
 
-// Display order for the carousel: OSC, NOISE, ENV, REVERB
-static const NodeType car_order[NODE_CLASS_COUNT] = { NODE_OSC, NODE_NOISE, NODE_ENV, NODE_REVERB };
+// Display order for the carousel: OSC, NOISE, ENV, REVERB, BEADS
+static const NodeType car_order[NODE_CLASS_COUNT] = { NODE_OSC, NODE_NOISE, NODE_ENV, NODE_REVERB, NODE_BEADS };
 
 void synth_page_touch(bool down, bool held, bool up, int x, int y) {
     if (held) { prev_x = cur_x; prev_y = cur_y; cur_x = x; cur_y = y; }
@@ -509,6 +514,7 @@ static void node_subtitle(const SynNode *n, char *out, size_t len) {
     case NODE_ENV:   snprintf(out, len, "%d/%d ms", (int)n->p[ENV_A], (int)n->p[ENV_D]); break;
     case NODE_OSC:   snprintf(out, len, "%s %d Hz", c->params[OSC_WAVE].labels[(int)n->p[OSC_WAVE]], (int)lroundf(n->p[OSC_FREQ])); break;
     case NODE_REVERB: snprintf(out, len, "%.1fs %d%%", n->p[REV_T60], (int)lroundf(n->p[REV_MIX] * 100)); break;
+    case NODE_BEADS:  snprintf(out, len, "%d ms%s", (int)lroundf(n->p[BD_SIZE]), n->p[BD_FREEZE] >= 0.5f ? " FRZ" : ""); break;
     default:         out[0] = 0;
     }
 }

@@ -281,7 +281,25 @@ int main(int argc, char **argv) {
     synth_page_open_popup(rv);
     render(OUT("synth-8-reverb-settings.png"), false);
     tap(2, 2);
-    tap(10, 36);                                 // carousel back
+
+    // BEADS: OSC -> ENV -> BEADS -> REVERB, frozen texture with pitch down a fifth
+    syn_init();
+    syn_delete_node(0); syn_delete_node(1);
+    int bo = syn_add_node(NODE_OSC, 24, 30), be = syn_add_node(NODE_ENV, 120, 30);
+    int bb = syn_add_node(NODE_BEADS, 120, 84), br = syn_add_node(NODE_REVERB, 216, 84);
+    syn_connect(bo, be); syn_connect(be, bb); syn_connect(bb, br);
+    syn_toggle_output(br, 0);
+    syn_set_param(bo, OSC_WAVE, WAVE_SAW);
+    syn_set_param(bb, BD_PITCH, -7); syn_set_param(bb, BD_SIZE, 450); syn_set_param(bb, BD_DENSITY, 0.55f);
+    syn_set_param(bb, BD_RANDOM, 0.35f); syn_set_param(bb, BD_FEEDBACK, 0.3f); syn_set_param(bb, BD_FREEZE, 1);
+    syn_set_param(br, REV_T60, 4); syn_set_param(br, REV_MIX, 0.35f);
+    tap(BOT_W - 10, 36);                         // carousel > > (shows + BEADS)
+    tap(105, 61);                                // % : fit
+    render(OUT("synth-9-beads.png"), false);
+    synth_page_open_popup(bb);
+    render(OUT("synth-10-beads-settings.png"), false);
+    tap(2, 2);
+    tap(10, 36); tap(10, 36);                    // carousel back
 
     // Settings popup (gear): default, then OSC + gyro turned on
     settings_open();
