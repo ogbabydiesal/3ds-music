@@ -1,0 +1,61 @@
+# Builds the 3DS apps and runs the host tests on every push and pull request.
+# Later platforms (desktop, iOS, Android) get their own jobs here.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-3ds:
+    name: 3DS build
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build osc3ds
+        run: make
+      - name: Build nodeTrix (release style, 3DS system font, no Arial)
+        run: make -C sequencer ROMFS= FONT_OUT=
+      - name: Collect builds
+        run: |
+          mkdir -p out
+          cp osc3ds.3dsx sequencer/nodeTrix.3dsx LICENSE THIRD_PARTY_NOTICES.md out/
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3dsx-builds
+          path: out/
+          retention-days: 14
+
+  tests:
+    name: Engine tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: DSP, patching, step sequencers, saving
+        run: make -C tests
+
+  ui:
+    name: UI renderer + gesture checks
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render screenshots from the real UI code (fails if a gesture check fails)
+        run: make -C tools/ui_render -B
+      - name: Screenshots that differ from the committed ones (font rendering can vary by macOS version)
+        run: git status --short docs/screenshots || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/screenshots/
+          retention-days: 14

@@ -220,6 +220,12 @@ static void write_wav(const char *path) {
     fclose(f);
 }
 
+static int gesture_fails = 0;
+static const char *pf(bool ok) {          // PASS/FAIL, counting failures for the exit code
+    if (!ok) gesture_fails++;
+    return ok ? "PASS" : "FAIL";
+}
+
 static int ncx(int i) { return 4 + (int)syn_nodes[i].x + 32; }
 static int ncy(int i) { return 73 + (int)syn_nodes[i].y + 15; }
 
@@ -455,16 +461,16 @@ int main(int argc, char **argv) {
         bool panned = fabsf(synth_dbg_sx(0) - p0x - 40) < 1 && fabsf(synth_dbg_sy(0) - p0y - 20) < 1;
         bool still = syn_nodes[xx].x == nx0 && syn_nodes[xx].y == ny0;
         printf("%s double-tap-hold on a node pans (%.0f, %.0f px), node unmoved %d, settings closed %d\n",
-               panned && still && !synth_page_popup_open() ? "PASS" : "FAIL",
+               pf(panned && still && !synth_page_popup_open()),
                synth_dbg_sx(0) - p0x, synth_dbg_sy(0) - p0y, still, !synth_page_popup_open());
         tap_now(cx + 40, cy + 20); settle();             // a single tap still opens settings
-        printf("%s single tap still opens settings\n", synth_page_popup_open() ? "PASS" : "FAIL");
+        printf("%s single tap still opens settings\n", pf(synth_page_popup_open()));
         tap(2, 2);
         float q0x = synth_dbg_sx(0);                    // slow second tap: no pan (box select instead)
         tap_now(10, 190); settle(); press(10, 190); for (int i = 1; i <= 5; i++) move(10 + 6 * i, 190); release_at(40, 190);
-        printf("%s two slow taps don't pan\n", synth_dbg_sx(0) == q0x ? "PASS" : "FAIL");
+        printf("%s two slow taps don't pan\n", pf(synth_dbg_sx(0) == q0x));
     }
     tap(10, 36); tap(10, 36);                    // carousel back
 
-    return 0;
+    return gesture_fails ? 1 : 0;
 }

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>                                     // strcasecmp
 #include <sys/stat.h>
 
 #define DEFAULT_DIR "sdmc:/3ds/nodeTrix/samples"

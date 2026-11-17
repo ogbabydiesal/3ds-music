@@ -1,5 +1,7 @@
 # nodeTrix
 
+[![CI](https://github.com/ogbabydiesal/nodeTrix/actions/workflows/ci.yml/badge.svg)](https://github.com/ogbabydiesal/nodeTrix/actions/workflows/ci.yml)
+
 Homebrew music tools for the Nintendo 3DS, written in C with [libctru](https://github.com/devkitPro/libctru) and citro2d. Two apps:
 
 - **osc3ds** turns the 3DS into a wireless **OSC controller**: buttons, sticks, an XY pad, faders, drum pads and motion sensors, sent over UDP on Wi-Fi.
@@ -241,8 +243,30 @@ common/netcfg.c/.h   shared config file, UDP socket, IP/port keyboard
 tools/osc_monitor.py desktop receiver for debugging
 tools/test_osc.c     host-side encoder test
 tools/ui_render/     renders SYNTH page screenshots on macOS from the real UI code
+tests/               host tests for the engine, step sequencers, WAV loader and slot files
+.github/workflows/   CI: builds and tests on every push
 docs/                SYNTH.md guide, PROMPTS.md build log, screenshots
 ```
+
+## Tests and CI
+
+```bash
+make -C tests
+```
+
+This runs about 70 checks on your computer (macOS or Linux, no 3DS or devkitPro needed), using the app's real engine code:
+- **Sound:** filter responses, delay timing and feedback, chorus depth, reverb decay, GRAINS pitch, freeze and seeding, SAMPLE speed and loops.
+- **WAV loading:** 8, 16, 24 and 32-bit and float files; broken files are skipped.
+- **Patching:** XFADE, one output feeding several nodes, refusing loops.
+- **Step sequencers:** values, clamping and slew timing.
+- **Saving:** round trips, older slot formats, and copying saves from before the rename.
+
+`make -C tools/ui_render` re-renders the screenshots and checks the canvas gestures.
+
+**GitHub Actions** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push and pull request:
+- builds osc3ds and nodeTrix with devkitPro's Docker image (nodeTrix without Arial, like a release); the `.3dsx` files are downloadable from the run;
+- runs the tests on Linux and macOS;
+- renders the screenshots on macOS and fails if a gesture check fails.
 
 ## Disclaimer and privacy
 
