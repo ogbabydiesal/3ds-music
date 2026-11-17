@@ -48,7 +48,52 @@ const NodeClass syn_classes[NODE_CLASS_COUNT] = {
             { "LEVEL", PARAM_LINEAR, 0,     1,    0.5f, "%" },
         },
     },
+    [NODE_REVERB] = {
+        // John Chowning's reverb as in STK's JCRev: 3 series allpasses, 4 parallel
+        // damped combs, two output delays for stereo. T60 = decay time to -60 dB.
+        .name = "REVERB", .has_input = true, .input_name = "AUDIO", .nparams = 3,
+        .params = {
+            { "T60",   PARAM_EXP,    0.1f, 20, 1.0f, "s" },
+            { "MIX",   PARAM_LINEAR, 0,    1,  0.3f, "%" },
+            { "LEVEL", PARAM_LINEAR, 0,    1,  1.0f, "%" },
+        },
+    },
 };
+
+
+// ------------------------------------------------------------- JCRev state ---
+// Delay lengths from STK JCRev (44.1 kHz), rescaled to our rate, odd and prime.
+static const int jc_len44[9] = { 1116, 1356, 1422, 1617, 225, 341, 441, 211, 179 };
+static int jc_len[9];
+#define JC_MAXLEN 1200          // >= longest rescaled length (1617 * 32000/44100 -> 1181)
+
+typedef struct {
+    float ap[3][JC_MAXLEN / 2]; int ap_i[3];    // allpasses (lengths 4..6, all < 600)
+    float cb[4][JC_MAXLEN];     int cb_i[4];    // combs (lengths 0..3)
+    float lp[4];                                // one-pole lowpass in each comb loop
+    float od[2][JC_MAXLEN / 4]; int od_i[2];    // output delays (lengths 7, 8)
+    float t60;                                  // T60 the comb coefficients were made for
+    float cc[4];
+} JCRev;
+static JCRev jc[SYN_MAX_NODES];
+
+static bool is_prime(int n) {
+    if (n < 2) return false;
+    for (int d = 2; d * d <= n; d++) if (n % d == 0) return false;
+    return true;
+}
+
+static void jc_lengths(void) {
+    double scaler = SYN_SAMPLE_RATE / 44100.0;
+    for (int i = 0; i < 9; i++) {
+        int d = (int)floor(scaler * jc_len44[i]);
+        if ((d & 1) == 0) d++;
+        while (!is_prime(d)) d += 2;
+        jc_len[i] = d;
+    }
+}
+
+static void jc_clear(int i) { memset(&jc[i], 0, sizeof jc[i]); }
 
 SynNode syn_nodes[SYN_MAX_NODES];
 static int order[SYN_MAX_NODES], norder = 0;    // evaluation order (inputs first)
@@ -100,6 +145,7 @@ static int add_node_locked(NodeType type, float x, float y) {
         n->outputs = 0;
         memset(n->mod_src, -1, sizeof n->mod_src);
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
+        jc_clear(i);
         const NodeClass *c = &syn_classes[type];
         for (int k = 0; k < c->nparams; k++) n->p[k] = c->params[k].def;
         for (int k = 0; k < SYN_WT_SIZE; k++)        // default custom wave: a lopsided bump
@@ -216,6 +262,7 @@ void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
         for (int k = 0; k < SYN_MAX_PARAMS; k++)
             n->mod_src[k] = (src[i].mod_src[k] >= 0 && src[i].mod_src[k] < 8) ? src[i].mod_src[k] : -1;
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
+        jc_clear(i);
     }
     for (int i = 0; i < SYN_MAX_NODES; i++) {          // drop links to missing nodes / loops
         SynNode *n = &syn_nodes[i];
@@ -236,6 +283,7 @@ void syn_init(void) {
     LightLock_Init(&graph_lock);
 #endif
     memset(syn_nodes, 0, sizeof syn_nodes);
+    jc_lengths();
     // Starter patch: white noise -> short envelope, played by the cube track
     int n = add_node_locked(NODE_NOISE, 24, 40);
     int e = add_node_locked(NODE_ENV, 130, 40);
@@ -350,7 +398,47 @@ static inline float process_osc(SynNode *n, float in, bool has_in) {
     return v * n->p[OSC_LEVEL];
 }
 
-void syn_render(int16_t *out, int nsamples) {
+// STK JCRev::tick, sample for sample. Writes left to n->out, right to n->out_r.
+static inline void process_reverb(SynNode *n, int idx, float input) {
+    JCRev *r = &jc[idx];
+    if (r->t60 != n->p[REV_T60]) {
+        r->t60 = n->p[REV_T60];
+        for (int i = 0; i < 4; i++)
+            r->cc[i] = powf(10.0f, -3.0f * jc_len[i] / (r->t60 * SYN_SAMPLE_RATE));
+    }
+    const float g = 0.7f;                       // allpassCoefficient_
+    float x = input;
+    for (int a = 0; a < 3; a++) {               // three allpasses in series
+        int len = jc_len[4 + a], *pi = &r->ap_i[a];
+        float d = r->ap[a][*pi];                // lastOut()
+        float w = g * d + x;
+        r->ap[a][*pi] = w;
+        if (++*pi >= len) *pi = 0;
+        x = -g * w + d;
+    }
+    float filtout = 0;
+    for (int k = 0; k < 4; k++) {               // four combs in parallel
+        int len = jc_len[k], *pi = &r->cb_i[k];
+        float fb = r->cc[k] * r->cb[k][*pi];
+        r->lp[k] = 0.8f * fb + 0.2f * r->lp[k]; // OnePole, pole 0.2
+        float t = x + r->lp[k];
+        r->cb[k][*pi] = t;
+        if (++*pi >= len) *pi = 0;
+        filtout += t;
+    }
+    float wet[2];
+    for (int c = 0; c < 2; c++) {               // output delays decorrelate L and R
+        int len = jc_len[7 + c], *pi = &r->od_i[c];
+        wet[c] = r->od[c][*pi];
+        r->od[c][*pi] = filtout;
+        if (++*pi >= len) *pi = 0;
+    }
+    float mix = n->p[REV_MIX], dry = (1.0f - mix) * input, lvl = 0.7f * n->p[REV_LEVEL];
+    n->out   = (mix * wet[0] + dry) * lvl;
+    n->out_r = (mix * wet[1] + dry) * lvl;
+}
+
+void syn_render(int16_t *out, int nframes) {
     GRAPH_LOCK();
     uint32_t trig = __atomic_exchange_n(&pending_triggers, 0, __ATOMIC_SEQ_CST);
     if (trig)
@@ -359,24 +447,32 @@ void syn_render(int16_t *out, int nsamples) {
             if (n->used && n->type == NODE_ENV && (n->trig_mask & trig)) env_gate(n);
         }
 
-    for (int s = 0; s < nsamples; s++) {
-        float mix = 0;
+    for (int s = 0; s < nframes; s++) {
+        float mix = 0, mix_r = 0;
         for (int o = 0; o < norder; o++) {
             SynNode *n = &syn_nodes[order[o]];
             bool has_in = n->input >= 0;
             float in = has_in ? syn_nodes[n->input].out : 0.0f;
+            if (has_in && syn_nodes[n->input].type == NODE_REVERB)     // stereo source: use the mid
+                in = 0.5f * (in + syn_nodes[n->input].out_r);
             switch (n->type) {
             case NODE_NOISE: n->out = process_noise(n); break;
             case NODE_ENV:   n->out = process_env(n, has_in ? in : 1.0f); break;   // alone: its contour
             case NODE_OSC:   n->out = process_osc(n, in, has_in); break;
+            case NODE_REVERB: process_reverb(n, order[o], in); break;
             default:         n->out = 0;
             }
-            if (n->outputs) mix += n->out;
+            if (n->outputs) {
+                mix += n->out;
+                mix_r += n->type == NODE_REVERB ? n->out_r : n->out;
+            }
         }
-        mix *= 0.9f;
-        if (mix > 1.0f) mix = 1.0f;
-        if (mix < -1.0f) mix = -1.0f;
-        out[s] = (int16_t)(mix * 32000.0f);
+        float ch[2] = { mix * 0.9f, mix_r * 0.9f };
+        for (int c = 0; c < 2; c++) {
+            if (ch[c] > 1.0f) ch[c] = 1.0f;
+            if (ch[c] < -1.0f) ch[c] = -1.0f;
+            out[2 * s + c] = (int16_t)(ch[c] * 32000.0f);
+        }
     }
     GRAPH_UNLOCK();
 }
@@ -403,7 +499,7 @@ static void audio_fn(void *arg) {
         for (int i = 0; i < NBUFS; i++) {
             if (wbuf[i].status != NDSP_WBUF_DONE && wbuf[i].status != NDSP_WBUF_FREE) continue;
             syn_render(wbuf[i].data_pcm16, BUF_SAMPLES);
-            DSP_FlushDataCache(wbuf[i].data_pcm16, BUF_SAMPLES * sizeof(int16_t));
+            DSP_FlushDataCache(wbuf[i].data_pcm16, BUF_SAMPLES * 2 * sizeof(int16_t));
             ndspChnWaveBufAdd(0, &wbuf[i]);
         }
         LightEvent_Wait(&audio_event);
@@ -416,17 +512,17 @@ bool syn_audio_start(void) {
     ndspChnReset(0);
     ndspChnSetInterp(0, NDSP_INTERP_LINEAR);
     ndspChnSetRate(0, SYN_SAMPLE_RATE);
-    ndspChnSetFormat(0, NDSP_FORMAT_MONO_PCM16);
+    ndspChnSetFormat(0, NDSP_FORMAT_STEREO_PCM16);
     float mix[12] = { 0 };
-    mix[0] = mix[1] = 1.0f;
+    mix[0] = mix[1] = 1.0f;                  // L -> front left, R -> front right
     ndspChnSetMix(0, mix);
 
-    audio_mem = (int16_t *)linearAlloc(NBUFS * BUF_SAMPLES * sizeof(int16_t));
+    audio_mem = (int16_t *)linearAlloc(NBUFS * BUF_SAMPLES * 2 * sizeof(int16_t));
     if (!audio_mem) { ndspExit(); return false; }
-    memset(audio_mem, 0, NBUFS * BUF_SAMPLES * sizeof(int16_t));
+    memset(audio_mem, 0, NBUFS * BUF_SAMPLES * 2 * sizeof(int16_t));
     memset(wbuf, 0, sizeof wbuf);
     for (int i = 0; i < NBUFS; i++) {
-        wbuf[i].data_vaddr = audio_mem + i * BUF_SAMPLES;
+        wbuf[i].data_vaddr = audio_mem + i * BUF_SAMPLES * 2;
         wbuf[i].nsamples = BUF_SAMPLES;
     }
 

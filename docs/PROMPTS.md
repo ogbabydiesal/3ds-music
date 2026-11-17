@@ -7,7 +7,7 @@ Everything in this repo was written in one conversation with an AI coding agent.
 | **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
 | **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
 | **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 11:55 (US Eastern), about 34 hours of calendar time, most of it the author away or testing |
-| **Claude's working time** | **about 1 hour 20 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
+| **Claude's working time** | **about 1 hour 30 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
 | **Prompts** | 27 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
 
 **About the working time:** it's measured from the session transcript timestamps, from each prompt to the end of Claude's reply. It includes thinking, writing code and waiting on tools such as compiles and installs. Reasoning time can't be separated out, because the transcript doesn't record it. The three biggest turns were the first sequencer (~8 min), the synth page (~6.6 min), and oscillators with zoom, box select and copy/paste (~4.7 min).
@@ -56,6 +56,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 34 | 12:05 | 0.3 min | what controls do i use to control the emulator? |
 | 35 | 12:10 | 0.5 min | why do i get no sound? |
 | 36 | 12:12 | 0.1 min | *(button)* Yes, on the 3DS |
+| 37 | 21:15 | ~9 min | let's make a reverb plugin inspired by, but as close to john chowning's reverb often called jcreverb in many dsp programs, https://ccrma.stanford.edu/software/stk/classstk_1_1JCRev.html |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -84,3 +85,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
 11. **Release v0.2.0**: the settings gear, OSC off by default, separate gyro/accel, and save/load/song, published as downloadable `.3dsx` files.
 12. **STEPS page**: four parameter step-sequencer lanes (A–D), each with a TRIG shape, a TARGET node and parameter, a MIN/MAX range in real units, and 1–16 drawable sliders that advance once per pulse and loop. Lanes are saved in slots, synth nodes are numbered for targeting, and a Mac test checked the stepping and the save/load round trip.
 13. **S1–S8 rework**: replaced the per-target lanes with 8 shared step sequencers. Each has a TRIG shape, a step count, and a plain-number MIN/MAX typed on the 3DS keypad. They're assigned per parameter with an S box in each synth node's settings. Values pass through linearly and are clamped to the parameter's range. Assignments are kept on paste and in saves.
+14. **REVERB node**: a stereo port of STK's JCRev (John Chowning's reverb): 3 series allpasses (0.7), 4 parallel combs with one-pole damping (pole 0.2) and T60-derived feedback, 2 output delays for left and right, STK's delay lengths rescaled to 32 kHz primes, MIX and the 0.7 output gain. The audio engine went from mono to stereo for it. A Mac test checked the decay rate, L/R decorrelation and levels.

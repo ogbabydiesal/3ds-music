@@ -411,8 +411,8 @@ static void toolbar_touch_down(int x) {
     }
 }
 
-// Display order for the carousel: OSC, NOISE, ENV
-static const NodeType car_order[NODE_CLASS_COUNT] = { NODE_OSC, NODE_NOISE, NODE_ENV };
+// Display order for the carousel: OSC, NOISE, ENV, REVERB
+static const NodeType car_order[NODE_CLASS_COUNT] = { NODE_OSC, NODE_NOISE, NODE_ENV, NODE_REVERB };
 
 void synth_page_touch(bool down, bool held, bool up, int x, int y) {
     if (held) { prev_x = cur_x; prev_y = cur_y; cur_x = x; cur_y = y; }
@@ -508,6 +508,7 @@ static void node_subtitle(const SynNode *n, char *out, size_t len) {
     case NODE_NOISE: snprintf(out, len, "%s", c->params[NOISE_TYPE].labels[(int)n->p[NOISE_TYPE]]); break;
     case NODE_ENV:   snprintf(out, len, "%d/%d ms", (int)n->p[ENV_A], (int)n->p[ENV_D]); break;
     case NODE_OSC:   snprintf(out, len, "%s %d Hz", c->params[OSC_WAVE].labels[(int)n->p[OSC_WAVE]], (int)lroundf(n->p[OSC_FREQ])); break;
+    case NODE_REVERB: snprintf(out, len, "%.1fs %d%%", n->p[REV_T60], (int)lroundf(n->p[REV_MIX] * 100)); break;
     default:         out[0] = 0;
     }
 }

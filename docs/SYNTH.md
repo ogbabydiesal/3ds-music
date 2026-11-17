@@ -15,7 +15,7 @@ From top to bottom:
 | Area | What it does |
 |---|---|
 | **Header** | Page name; **SAVE / LOAD / SONG**, where slots store the pattern and this synth patch; and the **settings gear**: OSC output on/off, target IP/port, gyro and accel over OSC. The gear is green while OSC is on. |
-| **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. **<** / **>** scroll the carousel once there are more classes. |
+| **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**, **+ REVERB**. Three fit at a time; **<** / **>** scroll to the rest. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
 | **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. Each node shows its number (e.g. "OSC 4"), which the STEPS page uses when listing what each sequencer drives. |
 | **Bottom bar** | PLAY/STOP, BPM, and the **< >** page arrows. These are the same on every page. |
@@ -65,6 +65,29 @@ No input.
 **Input = AUDIO.** The envelope shapes the volume of whatever is plugged in, like a VCA. **With nothing plugged in**, it outputs the envelope shape itself (0 to 1). That's how you modulate an OSC's pitch.
 
 An envelope is **triggered** when a shape fires, if the envelope feeds, directly or further down the chain, an output node for that shape.
+
+### REVERB: JCRev
+
+A port of the **JCRev** reverb from Stanford's [Synthesis ToolKit (STK)](https://ccrma.stanford.edu/software/stk/classstk_1_1JCRev.html), based on John Chowning's classic reverb design. It follows STK's `JCRev::tick` step for step:
+
+1. **3 allpass filters in series** (coefficient 0.7) smear the input into a dense cloud.
+2. **4 comb filters in parallel** create the decay. Each has a one-pole lowpass (pole 0.2) in its feedback loop, so highs die away first.
+3. **2 short output delays** take the comb sum to the left and right channels at slightly different times. This gives the stereo width.
+
+STK's delay lengths are for 44.1 kHz. Like STK, they're rescaled to this synth's 32 kHz and rounded to prime numbers: combs 809, 983, 1031 and 1181 samples; allpasses 163, 251 and 331; output delays 157 and 131.
+
+| Setting | Range | Notes |
+|---|---|---|
+| T60 | 0.1 – 20 s | Decay time to −60 dB. Each comb's feedback is `10^(−3 × length / (T60 × rate))`, as in STK's `setT60`. Default 1 s, like STK. |
+| MIX | 0–100% | Wet/dry balance (STK's effect mix). Default 30%, like STK. |
+| LEVEL | 0–100% | Output volume. STK's fixed 0.7 output gain is applied as well. |
+
+**Input = AUDIO.** Patch an instrument's last node into it, for example NOISE → ENV → **REVERB**, and set **OUTPUT on the REVERB** instead of the ENV. Triggering still works: the ENV feeds an output, so the shape's pulses still play it.
+
+The reverb is **stereo**, unlike the other nodes; everything else plays equally in both speakers. If a REVERB feeds another node, that node gets the average of left and right. The tail keeps ringing between pulses and isn't cut when the next note starts. Like STK, the high frequencies decay faster than T60 because of the lowpass in the comb loops, so a bright source can sound a little shorter than the number says.
+
+| ![REVERB on the canvas](screenshots/synth-7-reverb.png) | ![REVERB settings](screenshots/synth-8-reverb-settings.png) |
+|---|---|
 
 ## Settings box and OUTPUT
 
@@ -122,7 +145,7 @@ Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** p
 
 ## Sound output
 
-- Audio is mono at 32 kHz through the 3DS speakers and headphone jack.
+- Audio is 32 kHz stereo through the 3DS speakers and headphone jack. Only REVERB adds stereo width; every other node is centred.
 - **It needs the DSP firmware file `sdmc:/3ds/dspfirm.cdc`.** Create it once by running the **DSP1** homebrew on your 3DS. Without it, the canvas shows "NO AUDIO: needs sdmc:/3ds/dspfirm.cdc" and everything else, including OSC, still works.
 - **Azahar:** copy the same file to `~/Library/Application Support/Azahar/sdmc/3ds/`.
 - Sound can land up to about 30 ms after the visual pulse, because of audio buffering. The OSC messages are sent on time.
@@ -138,3 +161,5 @@ Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** p
 | Zap / laser | ENV → OSC → ENV | OSC SAW 400 Hz, MOD 4 oct; pitch ENV D 120 ms |
 | Pluck | OSC → ENV | SQR, PW 25%, 220 Hz; ENV D 150 ms, S 0 |
 | Pad-ish drone hit | OSC → ENV | CUST wave, 110 Hz; ENV A 300 ms, LENGTH 800 ms, R 1.5 s |
+| Big snare / clap room | NOISE → ENV → REVERB | PINK, ENV D 90 ms; REVERB T60 1.2 s, MIX 35% |
+| Ambient pluck | OSC → ENV → REVERB | TRI 330 Hz, ENV D 200 ms; REVERB T60 6 s, MIX 60% |

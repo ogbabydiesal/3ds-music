@@ -3,7 +3,7 @@
 Homebrew music tools for the Nintendo 3DS, written in C with [libctru](https://github.com/devkitPro/libctru) and citro2d. Two apps:
 
 - **osc3ds** turns the 3DS into a wireless **OSC controller**: buttons, sticks, an XY pad, faders, drum pads and motion sensors, sent over UDP on Wi-Fi.
-- **eucseq** is a **stereoscopic 3D polyrhythmic / Euclidean sequencer** with a built-in **modular synth**. Five wireframe shape tracks orbit a ring on the 3D top screen. Each pulse sends OSC (`/shape_N/pulse`) and can play patches you build from oscillators, noise and envelopes on the touchscreen.
+- **eucseq** is a **stereoscopic 3D polyrhythmic / Euclidean sequencer** with a built-in **modular synth**. Five wireframe shape tracks orbit a ring on the 3D top screen. Each pulse sends OSC (`/shape_N/pulse`) and can play patches you build from oscillators, noise, envelopes and a reverb on the touchscreen.
 
 Both apps work with any OSC host, such as Max/MSP, Ableton (via Max/Connection Kit), TouchDesigner, Pure Data, Resolume, VCV Rack, SuperCollider, Bitwig or Reaper.
 
@@ -187,10 +187,11 @@ Sequencers and their assignments are saved in slots along with the synth patch. 
 
 Use the **<** and **>** buttons at the right of the bottom bar to switch pages: SEQUENCER → SYNTH → STEPS.
 
-- **Carousel** (top row): **OSC**, **NOISE** and **ENV**. Tap a class to add it to the canvas, or drag it to place it.
+- **Carousel** (top row): **OSC**, **NOISE**, **ENV** and **REVERB** (scroll with **<** / **>**). Tap a class to add it to the canvas, or drag it to place it.
   - **OSC**: WAVE (SINE, TRI, SAW, SQR, CUST), FREQ (20–4000 Hz), PW (pulse width for SQR), MOD and LEVEL. Choosing **CUST** shows a 16-point waveform you draw with the stylus. The OSC input bends pitch by MOD octaves, so patch an ENV into it for kick drums and zaps.
   - **NOISE**: TYPE (WHITE, PINK, BROWN) and LEVEL.
   - **ENV**: ATTACK, DECAY, SUSTAIN, RELEASE, LENGTH and LEVEL. It shapes the volume of whatever is patched into it. With nothing plugged in, it outputs the envelope shape itself, which is useful for modulating an OSC.
+  - **REVERB**: a stereo port of STK's **JCRev** (John Chowning's reverb): 3 allpasses, 4 damped combs and 2 output delays. Settings: T60 (0.1–20 s), MIX and LEVEL. Patch an instrument into it and turn OUTPUT on for the REVERB.
 - **Toolbar:**
   - **BOX / PAN** sets what dragging on empty canvas does: box-select or pan.
   - **−** / **%** / **+** zoom. Tap the percentage to fit everything on screen.

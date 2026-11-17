@@ -267,6 +267,22 @@ int main(int argc, char **argv) {
     tap(105, 61);                                // tap the % button: fit everything
     render(OUT("synth-6-copy-paste-zoom.png"), false);
 
+    // REVERB: starter NOISE -> ENV -> REVERB, the reverb is now the output; carousel scrolled to show it
+    syn_init();
+    int rv = syn_add_node(NODE_REVERB, 236, 40);
+    syn_connect(1, rv);
+    syn_clear_outputs(1);
+    syn_toggle_output(rv, 0);
+    syn_set_param(rv, REV_T60, 2.5f);
+    syn_set_param(rv, REV_MIX, 0.4f);
+    tap(105, 61);                                // % : fit
+    tap(BOT_W - 10, 36);                         // carousel > (shows + REVERB)
+    render(OUT("synth-7-reverb.png"), false);
+    synth_page_open_popup(rv);
+    render(OUT("synth-8-reverb-settings.png"), false);
+    tap(2, 2);
+    tap(10, 36);                                 // carousel back
+
     // Settings popup (gear): default, then OSC + gyro turned on
     settings_open();
     render(OUT("settings-1-default.png"), false);
