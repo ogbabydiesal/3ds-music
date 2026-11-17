@@ -62,6 +62,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 40 | 22:05 | ~6 min | can beads be used in a free ware or paid application? please do an audit on all of the algorithms in this application in terms of their licenses |
 | 41 | 22:15 | ~5 min | rename to grains but in the settings can we put an attribution page that says the algorithm is an implementation of beads? |
 | 42 | 22:25 | 0.1 min | *(button)* Looks good |
+| 43 | 23:12 | ~3 min | *(button)* Publish v0.3.0 |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -94,3 +95,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
 15. **BEADS node**: a granular texture processor modeled on Mutable Instruments Beads, written from its manual. It has an 8 s recording buffer, 16 stereo grains, TIME / SIZE / SHAPE / PITCH / DENSITY (steady vs random) / RANDOM / FEEDBACK / MIX / DIR / FREEZE, and shape pulses as SEED. Nodes can now have 10 settings, slot files moved to v2 (v1 files still load), and the settings box uses slimmer rows for big nodes. Mac tests checked pitch, reverse, freeze, seeding, stereo, feedback stability and the slot formats.
 16. **Licence audit**: [docs/LICENSES.md](LICENSES.md) covers every algorithm, library and asset, plus THIRD_PARTY_NOTICES.md with the STK licence for the JCRev port. It found that the BEADS *name* (a Mutable Instruments trademark) and the default devkitPro icon should change before a paid release, and checked that release builds contain no Arial.
 17. **GRAINS + CREDITS**: renamed the BEADS node to GRAINS. Added a CREDITS page in Settings that credits the Beads algorithm (Emilie Gillet / Mutable Instruments, not affiliated), STK's JCRev with its copyright, Kellett's pink noise and the libraries. `make release` now ships THIRD_PARTY_NOTICES.md.
+18. **Release v0.3.0**: S1–S8 step sequencers, REVERB, GRAINS, stereo audio and the CREDITS page, published with the `.3dsx` files and THIRD_PARTY_NOTICES.md.
