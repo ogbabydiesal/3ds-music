@@ -15,6 +15,8 @@ Ready-to-run builds are on the [**Releases**](https://github.com/ogbabydiesal/no
 - `osc3ds.3dsx`
 - `nodeTrix.3dsx` (called `eucseq.3dsx` up to v0.3.0). This build uses the 3DS system font, because Arial can't be redistributed. If you build it yourself on a Mac, you get Arial.
 
+**Buy / support:** nodeTrix is coming to itch.io as a pay-what-you-want download (from $5). The code stays MIT-licensed here.
+
 To install, copy the `.3dsx` files to `/3ds/` on your SD card and launch them from the Homebrew Launcher. You need a 3DS with custom firmware. nodeTrix's sound also needs `sdmc:/3ds/dspfirm.cdc`, which you create with the DSP1 homebrew.
 
 To make release builds yourself, run `make release`. It writes both files to `dist/`.
@@ -235,6 +237,12 @@ tools/ui_render/     renders SYNTH page screenshots on macOS from the real UI co
 docs/                SYNTH.md guide, PROMPTS.md build log, screenshots
 ```
 
+## Disclaimer and privacy
+
+- nodeTrix and osc3ds are independent homebrew. They are **not affiliated with, endorsed or sponsored by Nintendo**, nor by Mutable Instruments (GRAINS implements the Beads algorithm; see Settings → CREDITS). Nintendo 3DS is a trademark of Nintendo.
+- Running homebrew needs a 3DS with custom firmware and the Homebrew Launcher. Modifying a console is done at your own risk, and the software comes with no warranty (see LICENSE).
+- **Privacy:** the apps collect nothing and contact no servers. They only send OSC messages over your local network, to the IP address and port you enter in Settings, and only while OSC output is on. Settings and saves stay on your SD card.
+
 ## Licences
 
-See **[docs/LICENSES.md](docs/LICENSES.md)** for an audit of every algorithm, library and asset, and **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** for the notices to ship with builds. The REVERB node is derived from STK's JCRev, under the MIT-style STK licence. GRAINS is an independent implementation of the granular algorithm of Mutable Instruments' Beads.
+**nodeTrix and osc3ds are released under the [MIT licence](LICENSE).** See **[docs/LICENSES.md](docs/LICENSES.md)** for an audit of every algorithm, library and asset, and **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** for the notices to ship with builds. The REVERB node is derived from STK's JCRev, under the MIT-style STK licence. GRAINS is an independent implementation of the granular algorithm of Mutable Instruments' Beads.

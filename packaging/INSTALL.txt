@@ -1,0 +1,32 @@
+nodeTrix - 3D Euclidean sequencer + modular synth for Nintendo 3DS homebrew
+==========================================================================
+
+REQUIREMENTS
+- A Nintendo 3DS / 2DS family console with custom firmware and the
+  Homebrew Launcher.
+- For sound: the DSP firmware file sdmc:/3ds/dspfirm.cdc. Create it once by
+  running the "DSP1" homebrew on your console. Without it, nodeTrix runs
+  silently (OSC output still works).
+
+INSTALL
+1. Copy nodeTrix.3dsx to the /3ds/ folder on your SD card.
+2. Put the card back, open the Homebrew Launcher and start nodeTrix.
+
+YOUR DATA
+- Saves (8 slots and the song) are in sdmc:/3ds/nodeTrix/slots/
+- Settings are in sdmc:/3ds/nodeTrix/settings.ini
+- Network settings for OSC are shared with osc3ds in sdmc:/3ds/osc3ds/config.ini
+
+PRIVACY
+nodeTrix collects nothing and contacts no servers. It only sends OSC messages
+on your local network, to the IP and port you set, while OSC output is on.
+
+GUIDE
+Full manual and screenshots: https://github.com/ogbabydiesal/nodeTrix
+
+LICENCE
+MIT - see LICENSE. Third-party credits: THIRD_PARTY_NOTICES.md and, in the
+app, Settings (gear) > CREDITS.
+
+nodeTrix is independent homebrew, not affiliated with or endorsed by
+Nintendo or Mutable Instruments. Use at your own risk; no warranty.

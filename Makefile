@@ -78,7 +78,7 @@ endif
 
 export _3DSXFLAGS += --smdh=$(CURDIR)/$(TARGET).smdh
 
-.PHONY: all clean run send release
+.PHONY: all clean run send release itch
 
 
 all: $(BUILD)
@@ -92,8 +92,16 @@ release:
 	$(MAKE) clean && $(MAKE) all && cp $(TARGET).3dsx dist/
 	$(MAKE) -C sequencer clean && $(MAKE) -C sequencer all ROMFS= FONT_OUT= && cp sequencer/nodeTrix.3dsx dist/
 	$(MAKE) -C sequencer clean && $(MAKE) -C sequencer all
-	cp THIRD_PARTY_NOTICES.md dist/
+	cp THIRD_PARTY_NOTICES.md LICENSE dist/
 	@ls -l dist
+
+# itch.io download: nodeTrix only -> dist/nodeTrix-$(NODETRIX_VERSION).zip
+NODETRIX_VERSION ?= 0.4.0
+itch: release
+	rm -rf dist/itch && mkdir -p dist/itch/nodeTrix
+	cp dist/nodeTrix.3dsx LICENSE THIRD_PARTY_NOTICES.md packaging/INSTALL.txt dist/itch/nodeTrix/
+	cd dist/itch && rm -f ../nodeTrix-$(NODETRIX_VERSION).zip && zip -qr -X ../nodeTrix-$(NODETRIX_VERSION).zip nodeTrix
+	@unzip -l dist/nodeTrix-$(NODETRIX_VERSION).zip
 
 # Preview in the Azahar emulator. Override with: make run AZAHAR=/path/to/Azahar.app
 AZAHAR ?= $(firstword $(wildcard /Applications/Azahar.app $(HOME)/Applications/Azahar.app $(HOME)/Downloads/azahar-*/Azahar.app))

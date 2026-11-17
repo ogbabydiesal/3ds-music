@@ -120,8 +120,56 @@ static void render(const char *path, int scale) {
     printf("wrote %s\n", path);
 }
 
+// Centered single line of text; y is the baseline in a y-down context.
+static void label(CGContextRef c, const char *str, const char *font, double size, double cx, double y,
+                  double r, double g, double b) {
+    CFStringRef fs = CFStringCreateWithCString(NULL, font, kCFStringEncodingUTF8);
+    CTFontRef f = CTFontCreateWithName(fs, size, NULL);
+    CGColorRef col = CGColorCreateGenericRGB(r / 255, g / 255, b / 255, 1);
+    const void *keys[] = { kCTFontAttributeName, kCTForegroundColorAttributeName };
+    const void *vals[] = { f, col };
+    CFDictionaryRef attr = CFDictionaryCreate(NULL, keys, vals, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFStringRef ss = CFStringCreateWithCString(NULL, str, kCFStringEncodingUTF8);
+    CFAttributedStringRef as = CFAttributedStringCreate(NULL, ss, attr);
+    CTLineRef line = CTLineCreateWithAttributedString(as);
+    double w = CTLineGetTypographicBounds(line, NULL, NULL, NULL);
+    CGContextSaveGState(c);
+    CGContextSetTextMatrix(c, CGAffineTransformMakeScale(1, -1));
+    CGContextSetTextPosition(c, cx - w / 2, y);
+    CTLineDraw(line, c);
+    CGContextRestoreGState(c);
+    CFRelease(line); CFRelease(as); CFRelease(ss); CFRelease(attr); CGColorRelease(col); CFRelease(f); CFRelease(fs);
+}
+
+// itch.io cover image (630x500): the icon artwork large, the name and a tagline.
+static void render_cover(const char *path) {
+    int W = 630, H = 500;
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef c = CGBitmapContextCreate(NULL, W, H, 8, 0, cs, kCGImageAlphaPremultipliedLast);
+    CGContextTranslateCTM(c, 0, H); CGContextScaleCTM(c, 1, -1);
+    CGContextSetRGBFillColor(c, 12 / 255., 15 / 255., 19 / 255., 1);
+    CGContextFillRect(c, CGRectMake(0, 0, W, H));
+    CGContextSaveGState(c);
+    double sc = 7.0;
+    CGContextTranslateCTM(c, W / 2.0 - 24 * sc, 6);
+    CGContextScaleCTM(c, sc, sc);
+    draw(c);
+    CGContextRestoreGState(c);
+    label(c, "nodeTrix", "Helvetica-Bold", 60, W / 2.0, 412, 245, 245, 245);
+    label(c, "3D Euclidean sequencer + modular synth for 3DS homebrew", "Helvetica", 19, W / 2.0, 450, 170, 180, 190);
+    label(c, "OSC  \xc2\xb7  REVERB  \xc2\xb7  GRAINS  \xc2\xb7  8 STEP SEQUENCERS", "Helvetica-Bold", 14, W / 2.0, 478, 46, 196, 160);
+    CGImageRef img = CGBitmapContextCreateImage(c);
+    CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)path, strlen(path), false);
+    CGImageDestinationRef d = CGImageDestinationCreateWithURL(url, CFSTR("public.png"), 1, NULL);
+    CGImageDestinationAddImage(d, img, NULL);
+    CGImageDestinationFinalize(d);
+    CFRelease(d); CFRelease(url); CGImageRelease(img); CGContextRelease(c); CGColorSpaceRelease(cs);
+    printf("wrote %s\n", path);
+}
+
 int main(int argc, char **argv) {
     render(argc > 1 ? argv[1] : "icon.png", 1);
     render(argc > 2 ? argv[2] : "icon-preview.png", 8);
+    if (argc > 3) render_cover(argv[3]);
     return 0;
 }

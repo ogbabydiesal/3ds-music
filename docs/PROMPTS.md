@@ -7,7 +7,7 @@ Everything in this repo was written in one conversation with an AI coding agent.
 | **Model** | Claude Opus 5.5 (`claude-opus-5-5`), medium reasoning effort |
 | **Tool** | Claude Code, in the Claude desktop app (Code tab), auto permission mode |
 | **Dates** | Nov 15, 2026 01:51 → Nov 16, 2026 11:55 (US Eastern), about 34 hours of calendar time, most of it the author away or testing |
-| **Claude's working time** | **about 2 hours 10 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
+| **Claude's working time** | **about 2 hours 25 minutes** in total, including about 10 minutes lost to a runaway build loop Claude caused (prompt 23) |
 | **Prompts** | 27 written prompts (one sent mid-turn), plus two choices answered in question boxes (font, gyro), short button replies, a pasted installer log, and build/send commands run from the chat box |
 
 **About the working time:** it's measured from the session transcript timestamps, from each prompt to the end of Claude's reply. It includes thinking, writing code and waiting on tools such as compiles and installs. Reasoning time can't be separated out, because the transcript doesn't record it. The three biggest turns were the first sequencer (~8 min), the synth page (~6.6 min), and oscillators with zoom, box select and copy/paste (~4.7 min).
@@ -71,6 +71,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 49 | 00:05 | ~1 min | there's only one slot that i think you made |
 | 50 | 00:15 | ~2 min | *(button)* Card is in |
 | 51 | 00:20 | 0.1 min | *(button)* Leave as is |
+| 52 | 00:25 | ~9 min | let's continue with getting this to itch *(then answered: nodeTrix only; MIT licence; pay what you want, min $5)* |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
@@ -107,3 +108,4 @@ The author also ran `make -C sequencer run` and `make -C sequencer send IP=…` 
 19. **eucseq icon**: a 48×48 SMDH icon with the white ring, a red wireframe cube, a yellow sphere, a blue cylinder and the white star. It's drawn by a CoreGraphics generator in `tools/icon`, with gaps in the ring under each shape, and replaces the default devkitPro logo.
 20. **eucseq → nodeTrix**: renamed the app (home-menu title, `nodeTrix.3dsx`, release files, docs) and the GitHub repo. Saves moved to `sdmc:/3ds/nodeTrix/`; old slots and settings are carried over automatically on first launch. (Entries above keep the old name, as it was then.)
 21. **Save migration fix**: old slots didn't appear on the 3DS after the rename. Moving the whole folder wasn't reliable, so the app now copies each old slot and song file into `sdmc:/3ds/nodeTrix/slots/` if it isn't there yet. It never overwrites, and the old files stay. Tested on the Mac with a copy of real saves.
+22. **itch.io kit**: MIT `LICENSE`, a disclaimer and privacy note in the README, `make itch` (a zip with nodeTrix.3dsx, INSTALL.txt, LICENSE and the notices), a 630×500 cover image from the icon generator, and [docs/itch/PAGE.md](itch/PAGE.md) with the page text, field values, screenshots and the payment/tax setup steps.

@@ -59,6 +59,6 @@ Tools used only to build (devkitARM GCC, 3dslink, mkbcfnt, makerom, the macOS sc
 1. ~~Rename BEADS~~ Done: it's **GRAINS**, with attribution on the CREDITS page. Saved slots weren't affected, since nodes are stored by type number.
 2. **Icons:** nodeTrix is done. osc3ds still needs its own 48×48 `icon.png` next to the root Makefile.
 3. **Ship THIRD_PARTY_NOTICES.md** with every build. `make release` now copies it into `dist/`, and the app's **Settings → CREDITS** page lists the attributions and the STK copyright.
-4. **Add a licence for your own code.** The repo currently has no `LICENSE` file, so all rights are reserved by default, which is fine for selling. Choose a licence if you want others to be able to reuse the source.
+4. **Licence for your own code: done, MIT** (`LICENSE`). Anyone may use, change and even sell the code, as long as the copyright notice comes with it. On itch.io, people pay for a ready-made build and to support the project. MIT is compatible with everything in the audit: the STK licence is MIT-style, and the libraries are zlib/BSD.
 5. **Check the names.** The sequencer is now **nodeTrix**. "osc3ds" still uses Nintendo's "3DS" trademark, so rename it before selling it. Don't describe either app as official or endorsed. "Runs on Nintendo 3DS homebrew" is a factual description.
 6. **Where to sell.** The 3DS eShop is closed, so homebrew is sold directly, for example on itch.io or Gumroad. Nothing in this code stops that. Running it needs a homebrew-enabled console; describe that requirement plainly.
