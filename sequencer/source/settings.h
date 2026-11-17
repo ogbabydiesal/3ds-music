@@ -1,5 +1,5 @@
 // SETTINGS popup (gear icon in the header): OSC output on/off, target IP and
-// port, gyro and accelerometer over OSC (separately). Saved to sdmc:/3ds/osc3ds/eucseq.ini.
+// port, gyro and accelerometer over OSC (separately). Saved to sdmc:/3ds/nodeTrix/settings.ini.
 #pragma once
 #include <3ds.h>
 #include <stdbool.h>

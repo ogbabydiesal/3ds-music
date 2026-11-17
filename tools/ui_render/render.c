@@ -1,4 +1,4 @@
-// Renders the eucseq SYNTH page to PNG on macOS for documentation.
+// Renders the nodeTrix SYNTH page to PNG on macOS for documentation.
 //
 // It compiles the app's real page_synth.c + synth.c against a tiny citro2d
 // shim implemented with CoreGraphics/CoreText (Arial), then drives the page

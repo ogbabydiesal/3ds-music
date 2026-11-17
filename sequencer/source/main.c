@@ -1,4 +1,4 @@
-// eucseq — stereoscopic polyrhythmic / Euclidean sequencer that sends OSC.
+// nodeTrix (formerly eucseq) — stereoscopic polyrhythmic / Euclidean sequencer that sends OSC.
 //
 // The ring is one bar (4 beats). Five tracks, each a wireframe shape type
 // (cube, sphere, pyramid, diamond, cylinder), each subdivide the ring on their

@@ -1,4 +1,4 @@
-// Draws the eucseq app icon (48x48 SMDH icon) with CoreGraphics:
+// Draws the nodeTrix app icon (48x48 SMDH icon) with CoreGraphics:
 // the white ring with a red cube, a yellow sphere and a blue cylinder on it.
 //   make -C tools/icon        -> sequencer/icon.png (+ icon-preview.png at 8x)
 #include <ApplicationServices/ApplicationServices.h>

@@ -6,7 +6,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define SETTINGS_PATH "sdmc:/3ds/osc3ds/eucseq.ini"
+#define SETTINGS_PATH     "sdmc:/3ds/nodeTrix/settings.ini"
+#define OLD_SETTINGS_PATH "sdmc:/3ds/osc3ds/eucseq.ini"     // before the eucseq -> nodeTrix rename
 
 static bool osc_on = false;         // OSC output is OFF until the user turns it on
 static bool gyro_on = false;
@@ -44,15 +45,16 @@ void settings_exit(void) {
 
 static void save(void) {
     mkdir("sdmc:/3ds", 0777);
-    mkdir("sdmc:/3ds/osc3ds", 0777);
+    mkdir("sdmc:/3ds/nodeTrix", 0777);
     FILE *f = fopen(SETTINGS_PATH, "w");
     if (!f) return;
-    fprintf(f, "# eucseq settings\nosc=%d\ngyro=%d\naccel=%d\n", osc_on, gyro_on, accel_on);
+    fprintf(f, "# nodeTrix settings\nosc=%d\ngyro=%d\naccel=%d\n", osc_on, gyro_on, accel_on);
     fclose(f);
 }
 
 void settings_load(void) {
     FILE *f = fopen(SETTINGS_PATH, "r");
+    if (!f) f = fopen(OLD_SETTINGS_PATH, "r");
     if (f) {
         char line[64];
         int v;

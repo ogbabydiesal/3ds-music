@@ -17,8 +17,10 @@ static LightLock song_lock;
 #define SONG_UNLOCK() ((void)0)
 #endif
 
+#define APP_DIR       "sdmc:/3ds/nodeTrix"
+#define OLD_STORE_DIR "sdmc:/3ds/osc3ds/eucseq"     // where slots lived before the rename
 #ifndef STORE_DIR
-#define STORE_DIR "sdmc:/3ds/osc3ds/eucseq"
+#define STORE_DIR APP_DIR "/slots"
 #endif
 
 // ------------------------------------------------------------- slot files ---
@@ -30,8 +32,18 @@ static void slot_path(int slot, char *out, size_t n) { snprintf(out, n, STORE_DI
 
 static void make_dirs(void) {
     mkdir("sdmc:/3ds", 0777);
-    mkdir("sdmc:/3ds/osc3ds", 0777);
+    mkdir(APP_DIR, 0777);
     mkdir(STORE_DIR, 0777);
+}
+
+// First launch after the eucseq -> nodeTrix rename: move the old slots and song over.
+static void migrate_old_slots(void) {
+#ifdef __3DS__
+    struct stat st;
+    mkdir("sdmc:/3ds", 0777);
+    mkdir(APP_DIR, 0777);
+    if (stat(STORE_DIR, &st) != 0 && stat(OLD_STORE_DIR, &st) == 0) rename(OLD_STORE_DIR, STORE_DIR);
+#endif
 }
 
 static bool write_slot(int slot, const Pattern *p, const SynNode *nodes) {
@@ -219,6 +231,7 @@ void store_init(void) {
 #ifdef __3DS__
     LightLock_Init(&song_lock);
 #endif
+    migrate_old_slots();
     make_dirs();
     for (int s = 0; s < STORE_NSLOTS; s++) cache_ok[s] = read_slot(s, &cache[s], NULL, NULL);
     song_load();

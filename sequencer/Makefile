@@ -16,11 +16,11 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 # App metadata (shown in the Homebrew Launcher)
 #---------------------------------------------------------------------------------
-APP_TITLE       := eucseq
-APP_DESCRIPTION := 3D Euclidean sequencer (OSC)
+APP_TITLE       := nodeTrix
+APP_DESCRIPTION := 3D sequencer + modular synth
 APP_AUTHOR      := thomas
 
-TARGET      := eucseq
+TARGET      := nodeTrix
 BUILD       := build
 SOURCES     := source ../common
 DATA        := data

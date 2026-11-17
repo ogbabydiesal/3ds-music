@@ -1,6 +1,6 @@
 // SAVE / LOAD / SONG.
 //
-// 8 slots on the SD card (sdmc:/3ds/osc3ds/eucseq/slotN.txt), each holding a
+// 8 slots on the SD card (sdmc:/3ds/nodeTrix/slots/slotN.txt), each holding a
 // sequencer Pattern (BPM + 5 tracks) and the synth patch. SONG strings slots
 // together: each step plays slot S for B bars, then moves on (looping). Song
 // mode switches the sequencer pattern + BPM at bar lines; the synth patch

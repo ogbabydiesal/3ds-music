@@ -1,6 +1,6 @@
 # Third-party notices
 
-The eucseq and osc3ds apps include or are derived from the following third-party work. Ship this file, or an equivalent "About / Licenses" screen, with any build you distribute.
+The nodeTrix and osc3ds apps include or are derived from the following third-party work. Ship this file, or an equivalent "About / Licenses" screen, with any build you distribute.
 
 ## STK (The Synthesis ToolKit in C++): the REVERB node
 
