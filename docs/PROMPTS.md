@@ -63,6 +63,7 @@ Times are US Eastern. "Work" is Claude's time on that turn.
 | 41 | 22:15 | ~5 min | rename to grains but in the settings can we put an attribution page that says the algorithm is an implementation of beads? |
 | 42 | 22:25 | 0.1 min | *(button)* Looks good |
 | 43 | 23:12 | ~3 min | *(button)* Publish v0.3.0 |
+| 44 | 23:20 | ~1 min | what steps would i need to make my app compliant to sell on itch? what other app stores exist for something like this? |
 
 **About prompt 23's long turn:** Claude added a `make release` rule above `all`, which made it the default target. Each nested `make` then started `release` again, in an endless loop, for about 10 minutes until prompt 24 asked about it. Claude stopped the processes and fixed the rule. The release build now takes about 2 seconds.
 
