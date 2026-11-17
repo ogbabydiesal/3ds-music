@@ -52,8 +52,8 @@ const NodeClass syn_classes[NODE_CLASS_COUNT] = {
         },
     },
     [NODE_REVERB] = {
-        // John Chowning's reverb as in STK's JCRev: 3 series allpasses, 4 parallel
-        // damped combs, two output delays for stereo. T60 = decay time to -60 dB.
+        // John Chowning's reverb as in STK's JCRev (STK license: see THIRD_PARTY_NOTICES.md).
+        // 3 series allpasses, 4 parallel damped combs, two output delays for stereo. T60 = decay time to -60 dB.
         .name = "REVERB", .has_input = true, .input_name = "AUDIO", .stereo = true, .nparams = 3,
         .params = {
             { "T60",   PARAM_EXP,    0.1f, 20, 1.0f, "s" },
@@ -368,7 +368,7 @@ static inline float white(SynNode *n) {
 static inline float process_noise(SynNode *n) {
     float w = white(n), v;
     switch ((int)n->p[NOISE_TYPE]) {
-    case 1:                               // pink (Paul Kellet, economy version)
+    case 1:                               // pink (Paul Kellett's "economy" filter, music-dsp 2002)
         n->pk[0] = 0.99765f * n->pk[0] + w * 0.0990460f;
         n->pk[1] = 0.96300f * n->pk[1] + w * 0.2965164f;
         n->pk[2] = 0.57000f * n->pk[2] + w * 1.0526913f;

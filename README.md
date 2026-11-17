@@ -223,3 +223,7 @@ tools/test_osc.c     host-side encoder test
 tools/ui_render/     renders SYNTH page screenshots on macOS from the real UI code
 docs/                SYNTH.md guide, PROMPTS.md build log, screenshots
 ```
+
+## Licences
+
+See **[docs/LICENSES.md](docs/LICENSES.md)** for an audit of every algorithm, library and asset, and **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** for the notices to ship with builds. The REVERB node is derived from STK's JCRev, under the MIT-style STK licence. BEADS is an independent implementation inspired by Mutable Instruments' Beads.
