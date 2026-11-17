@@ -14,9 +14,10 @@
 #define SYN_NTRACKS      5
 #define SYN_WT_SIZE      16          // custom wave points
 
-typedef enum { NODE_NOISE, NODE_ENV, NODE_OSC, NODE_REVERB, NODE_GRAINS, NODE_CLASS_COUNT } NodeType;
+typedef enum { NODE_NOISE, NODE_ENV, NODE_OSC, NODE_REVERB, NODE_GRAINS,
+               NODE_MIC, NODE_FILTER, NODE_DELAY, NODE_CHORUS, NODE_SAMPLE, NODE_CLASS_COUNT } NodeType;   // saved by number: append only
 
-typedef enum { PARAM_LINEAR, PARAM_EXP, PARAM_ENUM } ParamKind;
+typedef enum { PARAM_LINEAR, PARAM_EXP, PARAM_ENUM, PARAM_FILE } ParamKind;   // FILE: index into samples.h
 
 typedef struct {
     const char *name;
@@ -43,6 +44,12 @@ enum { NOISE_TYPE, NOISE_LEVEL };
 enum { ENV_A, ENV_D, ENV_S, ENV_R, ENV_LEN, ENV_LEVEL };
 enum { OSC_WAVE, OSC_FREQ, OSC_PW, OSC_MOD, OSC_LEVEL };
 enum { REV_T60, REV_MIX, REV_LEVEL };
+enum { MIC_GAIN };
+enum { FLT_TYPE, FLT_CUTOFF, FLT_Q, FLT_LEVEL };
+enum { DLY_TIME, DLY_FEEDBACK, DLY_FTYPE, DLY_CUTOFF, DLY_Q, DLY_MIX, DLY_LEVEL };
+enum { CHO_RATE, CHO_DEPTH, CHO_MIX, CHO_LEVEL };
+enum { SMP_FILE, SMP_PITCH, SMP_START, SMP_END, SMP_LOOP, SMP_LEVEL };
+enum { FT_LP, FT_HP, FT_BP, FT_NOTCH };
 enum { GR_TIME, GR_SIZE, GR_SHAPE, GR_PITCH, GR_DENSITY, GR_RANDOM, GR_FEEDBACK, GR_MIX, GR_DIR, GR_FREEZE };
 enum { WAVE_SINE, WAVE_TRI, WAVE_SAW, WAVE_SQR, WAVE_CUSTOM };
 
@@ -90,6 +97,12 @@ float syn_norm_to_param(const ParamDef *d, float u);
 
 void syn_trigger(int track);                        // safe from any thread
 void syn_render(int16_t *out, int nframes);         // audio thread, interleaved stereo L,R
+
+// Microphone (MIC node). Call once per frame from the main thread: it turns the
+// 3DS microphone on while a MIC node exists and off when none is left.
+void syn_mic_poll(void);
+void syn_mic_stop(void);
+bool syn_mic_on(void);
 
 bool syn_audio_start(void);   // false if the DSP couldn't start (dspfirm.cdc missing)
 void syn_audio_stop(void);

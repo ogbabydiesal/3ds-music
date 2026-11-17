@@ -20,6 +20,10 @@ An audit of every algorithm, library and asset in **nodeTrix** (formerly eucseq)
 |---|---|---|---|---|
 | **REVERB** (JCRev) | `synth.c` `process_reverb` | Port of STK's `JCRev` (Perry Cook, Gary Scavone), after John Chowning's design and Schroeder's allpass/comb reverberator (1960s) | **STK licence (MIT-style)**: commercial use allowed, **keep the copyright and permission notice**. Included in THIRD_PARTY_NOTICES.md. Any patents on the 1960s designs have long expired. | Low |
 | **GRAINS** granular | `synth.c` `process_grains` | Own implementation of granular synthesis (Gabor, Xenakis, Roads), with features modeled on the Beads manual | Own code. Granular synthesis is a decades-old public technique. Renamed from BEADS; Beads is credited, not used as a name. | Low |
+| FILTER (and the filters in DELAY and CHORUS) | `synth.c` `svf_set`, `svf_tick` | State-variable filter in the topology-preserving / trapezoidal form published by Andrew Simper (Cytomic) in his free technical papers | A published mathematical method, implemented here from its equations. Credited on the CREDITS page. | Low |
+| DELAY, CHORUS | `synth.c` | Feedback delay with a filter in the loop; a delay swept by a triangle LFO with BBD-style darkening, in the style of classic one-knob chorus pedals | Own code; standard effect designs. No pedal maker's name is used. | None |
+| SAMPLE, WAV loader | `samples.c`, `synth.c` | RIFF/WAVE parsing and resampled playback | Own code. Users supply their own audio files, and none are shipped. | None |
+| MIC | `synth.c` | The 3DS microphone through libctru's MIC service | Uses libctru (zlib). | None |
 | Oscillators | `synth.c` `process_osc` | Sine, triangle, saw and square formulas; **PolyBLEP** anti-aliasing (Välimäki and colleagues, published around 2007) | Textbook DSP, own implementation. We know of no patent on PolyBLEP. | Low |
 | Custom wavetable | `synth.c` | 16-point linear-interpolated table | Own | None |
 | White noise | `synth.c` `white` | xorshift32 (George Marsaglia, 2003) | Public algorithm | None |

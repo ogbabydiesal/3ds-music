@@ -1,4 +1,5 @@
 #include "store.h"
+#include "samples.h"
 #include "modseq.h"
 #include "synth.h"
 #include "ui.h"
@@ -85,6 +86,10 @@ static bool write_slot(int slot, const Pattern *p, const SynNode *nodes) {
         for (int k = 0; k < SYN_WT_SIZE; k++) fprintf(f, " %g", n->wt[k]);
         for (int k = 0; k < SYN_MAX_PARAMS; k++) fprintf(f, " %d", n->mod_src[k]);   // S1..S8 per param
         fputc('\n', f);
+        if (n->type == NODE_SAMPLE && samples_count()) {              // the file by name: indexes shift
+            const Sample *sm = samples_get(((int)n->p[SMP_FILE]) % samples_count());
+            if (sm) fprintf(f, "sample %d %s\n", i, sm->name);
+        }
     }
     for (int i = 0; i < MOD_SEQS; i++) {
         const ModSeq *m = &mod_seqs[i];
@@ -131,6 +136,12 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             ModSeq *m = &seqs[i];
             m->trig = (int)v[1]; m->nsteps = (int)v[2]; m->min = v[3]; m->max = v[4];
             for (int k = 0; k < MOD_MAX_STEPS && 5 + k < nv; k++) m->v[k] = v[5 + k];
+        } else if (nodes && !strncmp(line, "sample ", 7)) {           // after its node line
+            char name[SAMPLES_NAME_LEN];
+            if (sscanf(line, "sample %d %39s", &a, name) == 2 && a >= 0 && a < SYN_MAX_NODES && nodes[a].used) {
+                int idx = samples_find(name);
+                if (idx >= 0) nodes[a].p[SMP_FILE] = (float)idx;
+            }
         } else if (nodes && !strncmp(line, "node ", 5)) {
             char *tok = strtok(line + 5, " \n");
             float v[6 + SYN_MAX_PARAMS + SYN_WT_SIZE + SYN_MAX_PARAMS];

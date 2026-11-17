@@ -52,6 +52,11 @@ Five wireframe shapes (a cube, a sphere, a pyramid, a diamond and a cylinder) or
 
 **Modular synth**
 - Patch nodes together on a zoomable canvas: oscillators (sine, triangle, saw, square, or a wave you draw), noise (white, pink, brown) and ADSR envelopes
+- **SAMPLE**: play your own .wav files on every hit, with pitch, start/end and loop
+- **MIC**: the 3DS microphone as a live sound source
+- **FILTER**: a resonant low-pass, high-pass, band-pass or notch filter
+- **DELAY**: up to 2 s of feedback delay with a filter in the loop and tape-style time glides
+- **CHORUS**: a one-knob analog-style chorus with a depth switch, for that watery early-'90s clean tone
 - **REVERB**: a port of John Chowning's classic JCRev reverb from Stanford's STK
 - **GRAINS**: a granular texture processor, an implementation of the Mutable Instruments Beads algorithm. It records, freezes, pitch-shifts, reverses and scatters grains in stereo.
 - Box select, copy and paste, and patches saved with your patterns
@@ -73,7 +78,7 @@ Five wireframe shapes (a cube, a sphere, a pyramid, a diamond and a cylinder) or
 
 **Open source.** nodeTrix is MIT-licensed; the full source and manual are on GitHub (github.com/ogbabydiesal/nodeTrix). Buying it here gets you a ready-to-run build and supports development.
 
-**Privacy:** nodeTrix collects no data and contacts no servers. It only sends OSC on your own network, to the address you set.
+**Privacy:** nodeTrix collects no data and contacts no servers. It only sends OSC on your own network, to the address you set. The microphone is used only while you have a MIC node in your patch, and its audio never leaves the console.
 
 *nodeTrix is independent homebrew, not affiliated with or endorsed by Nintendo or Mutable Instruments. Nintendo 3DS is a trademark of Nintendo. Modifying a console is at your own risk, and the software comes with no warranty. Credits are in Settings → CREDITS.*
 
@@ -88,7 +93,8 @@ Upload these (itch.io shows them in the sidebar):
 3. `docs/screenshots/synth-9-grains.png`: OSC → ENV → GRAINS → REVERB
 4. `docs/screenshots/synth-10-grains-settings.png`: GRAINS settings
 5. `docs/screenshots/steps-1-lane.png`: the STEPS page
-6. `docs/screenshots/store-2-song.png`: song mode
+6. `docs/screenshots/synth-11-sample-filter-delay-mic-chorus.png`: the new sound sources and effects
+7. `docs/screenshots/store-2-song.png`: song mode
 
 A short video of the top screen (filmed with a phone; the 3D effect doesn't survive screen capture) also works well. itch.io takes a YouTube or Vimeo link.
 

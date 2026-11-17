@@ -12,6 +12,10 @@ INSTALL
 1. Copy nodeTrix.3dsx to the /3ds/ folder on your SD card.
 2. Put the card back, open the Homebrew Launcher and start nodeTrix.
 
+SOUND FILES
+- Put .wav files in sdmc:/3ds/nodeTrix/samples/ (created on first launch) and
+  restart nodeTrix. Use them with the SAMPLE node.
+
 YOUR DATA
 - Saves (8 slots and the song) are in sdmc:/3ds/nodeTrix/slots/
 - Settings are in sdmc:/3ds/nodeTrix/settings.ini
@@ -20,6 +24,8 @@ YOUR DATA
 PRIVACY
 nodeTrix collects nothing and contacts no servers. It only sends OSC messages
 on your local network, to the IP and port you set, while OSC output is on.
+The microphone is used only while a MIC node exists; its audio is played on
+the console and never sent or saved.
 
 GUIDE
 Full manual and screenshots: https://github.com/ogbabydiesal/nodeTrix

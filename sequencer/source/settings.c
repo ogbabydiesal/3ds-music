@@ -126,16 +126,17 @@ static void credits_draw(float y0) {
         { "REVERB", { "JCRev from the Synthesis ToolKit (STK), after John",
                       "Chowning. Copyright (c) 1995-2023 Perry R. Cook and",
                       "Gary P. Scavone. STK license (MIT-style)." } },
-        { "NOISE",  { "Pink noise: Paul Kellett's filter (music-dsp).", NULL, NULL } },
+        { "DSP",    { "Pink noise: Paul Kellett's filter (music-dsp). FILTER,",
+                      "DELAY and CHORUS filters: Andrew Simper's (Cytomic) SVF.", NULL } },
         { "LIBRARIES", { "libctru, citro2d, citro3d (zlib); newlib.",
                          "Full notices: THIRD_PARTY_NOTICES.md", NULL } },
     };
     float y = y0 + TITLE_H;
     for (size_t i = 0; i < sizeof cr / sizeof cr[0]; i++) {
         text(SX + 10, y, 0.38f, COL_ACCENT, 0, "%s", cr[i].head);
-        y += 13;
-        for (int k = 0; k < 3 && cr[i].lines[k]; k++) { text(SX + 10, y, 0.31f, COL_FG, 0, "%s", cr[i].lines[k]); y += 11; }
-        y += 4;
+        y += 12;
+        for (int k = 0; k < 3 && cr[i].lines[k]; k++) { text(SX + 10, y, 0.31f, COL_FG, 0, "%s", cr[i].lines[k]); y += 10.5f; }
+        y += 3;
     }
     float cy = close_y();
     C2D_DrawRectSolid(SX + SW - 10 - 84, cy, 0.5f, 84, 24, COL_BTN);

@@ -27,6 +27,7 @@
 #include "settings.h"
 #include "store.h"
 #include "synth.h"
+#include "samples.h"
 #include "ui.h"
 
 #define NTRACKS     5
@@ -600,6 +601,7 @@ int main(void) {
     C3D_RenderTarget *bot   = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     tbuf = C2D_TextBufNew(4096);
     romfsInit();
+    samples_init(NULL);                               // .wav files for SAMPLE nodes
     ui_font = C2D_FontLoad("romfs:/arial.bcfnt");     // falls back to system font if missing
 
     build_meshes();
@@ -631,6 +633,7 @@ int main(void) {
         if (kDown & KEY_START) break;
         if (kDown & KEY_SELECT) { if (settings_is_open()) settings_close(); else settings_open(); }
         settings_tick();
+        syn_mic_poll();                               // mic on only while a MIC node exists
         store_ui_tick();
         if (kDown & KEY_A) seq_set_playing(!seq.playing);
         if (kDown & KEY_B) { LightLock_Lock(&seq_lock); seq.pos = -1e-9; LightLock_Unlock(&seq_lock); }
@@ -741,6 +744,7 @@ int main(void) {
     seq_thread_run = false;
     threadJoin(th, U64_MAX);
     threadFree(th);
+    syn_mic_stop();
     syn_audio_stop();
     settings_exit();
     if (ui_font) C2D_FontFree(ui_font);

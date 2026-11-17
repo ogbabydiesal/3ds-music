@@ -23,6 +23,7 @@
 #include "page_synth.h"
 #include "settings.h"
 #include "store.h"
+#include "samples.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -202,6 +203,20 @@ static void drag(int x0, int y0, int x1, int y1) {
 }
 
 // Screen centre of a node at the current (100%, unpanned) view
+// A short silent WAV so the SAMPLE node has file names to show.
+static void write_wav(const char *path) {
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    int frames = 3200, bytes = frames * 2, v;
+    short s;
+    fwrite("RIFF", 1, 4, f); v = 36 + bytes; fwrite(&v, 4, 1, f); fwrite("WAVEfmt ", 1, 8, f);
+    v = 16; fwrite(&v, 4, 1, f); s = 1; fwrite(&s, 2, 1, f); fwrite(&s, 2, 1, f);
+    v = 32000; fwrite(&v, 4, 1, f); v = 64000; fwrite(&v, 4, 1, f); s = 2; fwrite(&s, 2, 1, f); s = 16; fwrite(&s, 2, 1, f);
+    fwrite("data", 1, 4, f); fwrite(&bytes, 4, 1, f);
+    for (int i = 0; i < frames; i++) { s = 0; fwrite(&s, 2, 1, f); }
+    fclose(f);
+}
+
 static int ncx(int i) { return 4 + (int)syn_nodes[i].x + 32; }
 static int ncy(int i) { return 73 + (int)syn_nodes[i].y + 15; }
 
@@ -216,6 +231,9 @@ int main(int argc, char **argv) {
     char p[1200];
 #define OUT(name) (snprintf(p, sizeof p, "%s/%s", out, name), p)
 
+    mkdir("samples", 0777);
+    write_wav("samples/drum_loop.wav"); write_wav("samples/vox_chop.wav"); write_wav("samples/pad_c3.wav");
+    samples_init("samples");
     store_init();
     syn_init();
     mod_init();                                  // starter: NOISE(0) -> ENV(1), ENV out on shape 1
@@ -300,6 +318,33 @@ int main(int argc, char **argv) {
     render(OUT("synth-10-grains-settings.png"), false);
     tap(2, 2);
     tap(10, 36); tap(10, 36);                    // carousel back
+
+    // New nodes: SAMPLE -> FILTER -> DELAY on shape 2, MIC -> CHORUS -> REVERB on shape 3
+    syn_init();
+    syn_delete_node(0); syn_delete_node(1);
+    int ns = syn_add_node(NODE_SAMPLE, 24, 30), nf = syn_add_node(NODE_FILTER, 120, 30), nd = syn_add_node(NODE_DELAY, 216, 30);
+    int nm = syn_add_node(NODE_MIC, 24, 84), nc = syn_add_node(NODE_CHORUS, 120, 84), nr = syn_add_node(NODE_REVERB, 216, 84);
+    syn_connect(ns, nf); syn_connect(nf, nd); syn_connect(nm, nc); syn_connect(nc, nr);
+    syn_toggle_output(nd, 1); syn_toggle_output(nr, 2);
+    syn_set_param(ns, SMP_FILE, samples_find("drum_loop")); syn_set_param(ns, SMP_END, 0.5f); syn_set_param(ns, SMP_PITCH, -2);
+    syn_set_param(nf, FLT_TYPE, FT_BP); syn_set_param(nf, FLT_CUTOFF, 1800); syn_set_param(nf, FLT_Q, 3);
+    syn_set_param(nd, DLY_TIME, 375); syn_set_param(nd, DLY_FEEDBACK, 0.6f); syn_set_param(nd, DLY_CUTOFF, 2200); syn_set_param(nd, DLY_Q, 1.5f);
+    syn_set_param(nc, CHO_RATE, 1.2f);
+    syn_set_param(nr, REV_T60, 2.2f);
+    syn_set_mod_src(nd, DLY_CUTOFF, 1);          // S2 sweeps the delay's filter
+    tap(BOT_W - 10, 36);                         // carousel > (shows NOISE SAMPLE MIC)
+    tap(105, 61);                                // % : fit
+    render(OUT("synth-11-sample-filter-delay-mic-chorus.png"), false);
+    synth_page_open_popup(nd);
+    render(OUT("synth-12-delay-settings.png"), false);
+    tap(2, 2);
+    synth_page_open_popup(ns);
+    render(OUT("synth-13-sample-settings.png"), false);
+    tap(2, 2);
+    synth_page_open_popup(nc);
+    render(OUT("synth-14-chorus-settings.png"), false);
+    tap(2, 2);
+    tap(10, 36);                                 // carousel back
 
     // Settings popup (gear): default, then OSC + gyro turned on
     settings_open();

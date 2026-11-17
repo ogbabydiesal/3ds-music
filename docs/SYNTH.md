@@ -15,7 +15,7 @@ From top to bottom:
 | Area | What it does |
 |---|---|
 | **Header** | Page name; **SAVE / LOAD / SONG**, where slots store the pattern and this synth patch; and the **settings gear**: OSC output on/off, target IP/port, gyro and accel over OSC. The gear is green while OSC is on. |
-| **Carousel** | The node classes: **+ OSC**, **+ NOISE**, **+ ENV**, **+ REVERB**, **+ GRAINS**. Three fit at a time; **<** / **>** scroll to the rest. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. |
+| **Carousel** | The node classes, sources first and then effects: **+ OSC**, **+ NOISE**, **+ SAMPLE**, **+ MIC**, **+ ENV**, **+ FILTER**, **+ DELAY**, **+ CHORUS**, **+ REVERB**, **+ GRAINS**. Three fit at a time; **<** / **>** scroll to the rest. Tap one to add it to the canvas, or drag it onto the canvas to drop it at a spot. |
 | **Toolbar** | **BOX / PAN** sets what dragging on empty canvas does. **−** / **%** / **+** zoom; tap the % to fit everything. **COPY**, **PASTE** and **DEL** act on the selection. |
 | **Canvas** | Your patch. Nodes are squares with an **input** on the left edge and an **output** on the right. Each node shows its number (e.g. "OSC 4"), which the STEPS page uses when listing what each sequencer drives. |
 | **Bottom bar** | PLAY/STOP, BPM, and the **< >** page arrows. These are the same on every page. |
@@ -65,6 +65,78 @@ No input.
 **Input = AUDIO.** The envelope shapes the volume of whatever is plugged in, like a VCA. **With nothing plugged in**, it outputs the envelope shape itself (0 to 1). That's how you modulate an OSC's pitch.
 
 An envelope is **triggered** when a shape fires, if the envelope feeds, directly or further down the chain, an output node for that shape.
+
+### SAMPLE: sound file player
+
+Plays a **.wav file** from the SD card each time a shape pulses.
+
+1. Put files in **`sdmc:/3ds/nodeTrix/samples/`**. nodeTrix creates the folder on first launch.
+2. Any common WAV works: 8, 16, 24 or 32-bit, float, mono or stereo (mixed to mono), at any sample rate.
+3. Files are loaded when the app starts, up to 64 files and 24 MB of audio, so restart nodeTrix after adding files.
+
+| Setting | Range | Notes |
+|---|---|---|
+| FILE | your files, A–Z | Slide to pick a file. Saves remember the file by **name**, so adding files later doesn't break a slot. |
+| PITCH | −24 to +24 st | Playback speed: +12 is twice as fast and an octave up. Put it on a step sequencer for melodies. |
+| START / END | 0–100% | The part of the file to play. |
+| LOOP | OFF / ON | ON repeats START→END until the next pulse restarts it. |
+| LEVEL | 0–100% | |
+
+Every pulse restarts the file from START, like a drum machine. Patch it into FILTER, DELAY and the other effects like any other source.
+
+### MIC: microphone
+
+The 3DS's built-in microphone as a sound source. It has one setting, **GAIN** (0–8×, default 2×), and a filter that removes DC offset and rumble.
+
+- **The microphone is only on while a MIC node exists.** Delete the node and nodeTrix turns the mic off.
+- Like any node, you only hear it when OUTPUT is set. Through the speakers it can howl with feedback, so **use headphones**.
+- Mic audio never leaves the console. It's only processed and played locally, and it's never recorded to the SD card (GRAINS keeps 8 s in memory only).
+- MIC → GRAINS with FREEZE, or MIC → DELAY / CHORUS, are good places to start.
+
+### FILTER
+
+A resonant **state-variable filter**, in the topology-preserving ("trapezoidal") form described by Andrew Simper (Cytomic). It stays stable and clean when you sweep it fast with a step sequencer.
+
+| Setting | Range | Notes |
+|---|---|---|
+| TYPE | LP / HP / BP / NOTCH | Low-pass, high-pass, band-pass (0 dB at the centre) and notch. |
+| CUTOFF | 20 Hz – 15 kHz | |
+| Q | 0.5 – 20 | Resonance. 0.7 is flat; above about 5 it whistles. |
+| LEVEL | 0–100% | |
+
+**Input = AUDIO.** Put it on a sequencer: an S box on CUTOFF with MIN 200 and MAX 4000 gives classic stepped filter sweeps.
+
+### DELAY: feedback delay with filter
+
+A delay of up to **2 seconds**, with a **filter inside the feedback loop**, so every repeat passes through it again. LP repeats get darker each time, like tape; HP repeats get thinner; BP repeats get telephone-like.
+
+| Setting | Range | Notes |
+|---|---|---|
+| TIME | 1 ms – 2 s | Changes **glide**, so the pitch bends like a tape delay. Times of 1–20 ms with high feedback make metallic comb tones. |
+| FEEDBACK | 0–95% | How much each repeat feeds the next. It passes through a soft limiter, so high settings saturate instead of exploding. |
+| FILTER | LP / HP / BP / NOTCH | The filter in the loop. |
+| CUTOFF / Q | 20 Hz – 15 kHz / 0.5–20 | |
+| MIX | 0–100% | Dry/wet. |
+| LEVEL | 0–100% | |
+
+At 120 BPM a dotted-eighth echo is 375 ms, and a quarter note is 500 ms.
+
+### CHORUS
+
+A **one-knob analog chorus** in the style of the bucket-brigade pedals of the early '90s: the watery, seasick wobble of grunge clean guitars. A short delay (a few ms) is swept by a triangle LFO, darkened like a BBD chip, and mixed 50/50 with the dry signal.
+
+| Setting | Range | Notes |
+|---|---|---|
+| RATE | 0.05 – 8 Hz | The one knob: slow shimmer to fast vibrato-warble. |
+| DEPTH | LOW / HIGH | Like the pedals' depth switch. HIGH sweeps about 2–11 ms for the deep, detuned sound. |
+| MIX | 0–100% | 50% is the classic sound; 100% is pure vibrato. |
+| LEVEL | 0–100% | |
+
+**Input = AUDIO**, mono out. For that early-'90s clean tone: OSC (SAW or SQR) or SAMPLE → ENV → **CHORUS** (RATE about 1 Hz, DEPTH HIGH, MIX 50%) → REVERB.
+
+| ![SAMPLE → FILTER → DELAY and MIC → CHORUS → REVERB](screenshots/synth-11-sample-filter-delay-mic-chorus.png) | ![DELAY settings, with CUTOFF on S2](screenshots/synth-12-delay-settings.png) |
+|---|---|
+| ![SAMPLE settings](screenshots/synth-13-sample-settings.png) | ![CHORUS settings](screenshots/synth-14-chorus-settings.png) |
 
 ### REVERB: JCRev
 
@@ -194,4 +266,8 @@ Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** p
 | Big snare / clap room | NOISE → ENV → REVERB | PINK, ENV D 90 ms; REVERB T60 1.2 s, MIX 35% |
 | Ambient pluck | OSC → ENV → REVERB | TRI 330 Hz, ENV D 200 ms; REVERB T60 6 s, MIX 60% |
 | Granular cloud | OSC → ENV → GRAINS → REVERB | SAW 220 Hz; GRAINS SIZE 450 ms, DENSITY +55%, RANDOM 35%, PITCH −7 st, FEEDBACK 30%; REVERB T60 4 s |
+| Dub echo | SAMPLE → DELAY | SAMPLE a snare, DELAY 375 ms, FEEDBACK 70%, LP 1.5 kHz, MIX 40% |
+| Filter sweep | NOISE → ENV → FILTER | FILTER BP, Q 6; CUTOFF on S1 (MIN 300, MAX 5000) |
+| Grunge clean | OSC → ENV → CHORUS → REVERB | SQR 196 Hz; CHORUS RATE 1 Hz, HIGH, MIX 50%; REVERB T60 1.5 s |
+| Voice cloud | MIC → GRAINS → REVERB | headphones; GRAINS SIZE 300 ms, DENSITY +60%, RANDOM 40% |
 | Stutter hits | NOISE → ENV → GRAINS | GRAINS DENSITY 0 (one grain per pulse), SIZE 60 ms, SHAPE 0%, TIME 10% |

@@ -1,5 +1,6 @@
 #include "modseq.h"
 #include "page_synth.h"
+#include "samples.h"
 #include "synth.h"
 #include "ui.h"
 
@@ -294,6 +295,11 @@ static void popup_touch_down(int x, int y) {
 }
 
 static void format_value(const ParamDef *d, float v, char *out, size_t n) {
+    if (d->kind == PARAM_FILE) {
+        const Sample *sm = samples_count() ? samples_get(((int)v) % samples_count()) : NULL;
+        snprintf(out, n, "%.9s", sm ? sm->name : "no files");
+        return;
+    }
     if (d->unit[0] == '%') snprintf(out, n, "%d%%", (int)lroundf(v * 100));
     else if (!strcmp(d->unit, "st")) snprintf(out, n, "%+.1f st", v);
     else if (v < 10) snprintf(out, n, "%.1f %s", v, d->unit);
@@ -416,8 +422,11 @@ static void toolbar_touch_down(int x) {
     }
 }
 
-// Display order for the carousel: OSC, NOISE, ENV, REVERB, GRAINS
-static const NodeType car_order[NODE_CLASS_COUNT] = { NODE_OSC, NODE_NOISE, NODE_ENV, NODE_REVERB, NODE_GRAINS };
+// Display order for the carousel: sources, then shapers, then effects
+static const NodeType car_order[NODE_CLASS_COUNT] = {
+    NODE_OSC, NODE_NOISE, NODE_SAMPLE, NODE_MIC, NODE_ENV, NODE_FILTER,
+    NODE_DELAY, NODE_CHORUS, NODE_REVERB, NODE_GRAINS,
+};
 
 void synth_page_touch(bool down, bool held, bool up, int x, int y) {
     if (held) { prev_x = cur_x; prev_y = cur_y; cur_x = x; cur_y = y; }
@@ -514,6 +523,15 @@ static void node_subtitle(const SynNode *n, char *out, size_t len) {
     case NODE_ENV:   snprintf(out, len, "%d/%d ms", (int)n->p[ENV_A], (int)n->p[ENV_D]); break;
     case NODE_OSC:   snprintf(out, len, "%s %d Hz", c->params[OSC_WAVE].labels[(int)n->p[OSC_WAVE]], (int)lroundf(n->p[OSC_FREQ])); break;
     case NODE_REVERB: snprintf(out, len, "%.1fs %d%%", n->p[REV_T60], (int)lroundf(n->p[REV_MIX] * 100)); break;
+    case NODE_MIC:    snprintf(out, len, "x%.1f", n->p[MIC_GAIN]); break;
+    case NODE_FILTER: snprintf(out, len, "%s %d Hz", c->params[FLT_TYPE].labels[(int)n->p[FLT_TYPE]], (int)lroundf(n->p[FLT_CUTOFF])); break;
+    case NODE_DELAY:  snprintf(out, len, "%d ms %d%%", (int)lroundf(n->p[DLY_TIME]), (int)lroundf(n->p[DLY_FEEDBACK] * 100)); break;
+    case NODE_CHORUS: snprintf(out, len, "%.1f Hz %s", n->p[CHO_RATE], n->p[CHO_DEPTH] >= 0.5f ? "HIGH" : "LOW"); break;
+    case NODE_SAMPLE: {
+        const Sample *sm = samples_count() ? samples_get(((int)n->p[SMP_FILE]) % samples_count()) : NULL;
+        snprintf(out, len, "%.10s", sm ? sm->name : "no files");
+        break;
+    }
     case NODE_GRAINS:  snprintf(out, len, "%d ms%s", (int)lroundf(n->p[GR_SIZE]), n->p[GR_FREEZE] >= 0.5f ? " FRZ" : ""); break;
     default:         out[0] = 0;
     }

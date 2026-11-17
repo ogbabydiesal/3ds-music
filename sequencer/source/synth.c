@@ -1,4 +1,5 @@
 #include "synth.h"
+#include "samples.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -6,6 +7,7 @@
 
 #ifdef __3DS__
 #include <3ds.h>
+#include <malloc.h>
 static LightLock graph_lock;
 #define GRAPH_LOCK()   LightLock_Lock(&graph_lock)
 #define GRAPH_UNLOCK() LightLock_Unlock(&graph_lock)
@@ -20,6 +22,8 @@ static const char *const noise_types[] = { "WHITE", "PINK", "BROWN" };
 static const char *const wave_types[]  = { "SINE", "TRI", "SAW", "SQR", "CUST" };
 static const char *const dir_types[]   = { "FWD", "REV", "BOTH" };
 static const char *const off_on[]      = { "OFF", "ON" };
+static const char *const flt_types[]   = { "LP", "HP", "BP", "NOTCH" };
+static const char *const depth_types[] = { "LOW", "HIGH" };
 
 const NodeClass syn_classes[NODE_CLASS_COUNT] = {
     [NODE_NOISE] = {
@@ -77,6 +81,60 @@ const NodeClass syn_classes[NODE_CLASS_COUNT] = {
             { "MIX",      PARAM_LINEAR, 0,   1,    0.6f, "%"  },
             { "DIR",      PARAM_ENUM,   0,   2,    0,    "",   dir_types, 3 },
             { "FREEZE",   PARAM_ENUM,   0,   1,    0,    "",   off_on, 2 },
+        },
+    },
+    [NODE_MIC] = {
+        // The 3DS microphone (32.73 kHz, resampled). Only on while a MIC node exists.
+        .name = "MIC", .has_input = false, .input_name = "", .nparams = 1,
+        .params = {
+            { "GAIN", PARAM_LINEAR, 0, 8, 2, "x" },
+        },
+    },
+    [NODE_FILTER] = {
+        // State-variable filter (topology-preserving / "trapezoidal" form).
+        .name = "FILTER", .has_input = true, .input_name = "AUDIO", .nparams = 4,
+        .params = {
+            { "TYPE",   PARAM_ENUM,   0,    3,     0,      "",   flt_types, 4 },
+            { "CUTOFF", PARAM_EXP,    20,   15000, 1200,   "Hz" },
+            { "Q",      PARAM_EXP,    0.5f, 20,    0.707f, ""   },
+            { "LEVEL",  PARAM_LINEAR, 0,    1,     1,      "%"  },
+        },
+    },
+    [NODE_DELAY] = {
+        // Feedback delay (up to 2 s) with a filter inside the feedback loop: every
+        // repeat passes through it again. TIME changes glide, like tape.
+        .name = "DELAY", .has_input = true, .input_name = "AUDIO", .nparams = 7,
+        .params = {
+            { "TIME",     PARAM_EXP,    1,    2000,  300,    "ms" },
+            { "FEEDBACK", PARAM_LINEAR, 0,    0.95f, 0.45f,  "%"  },
+            { "FILTER",   PARAM_ENUM,   0,    3,     0,      "",   flt_types, 4 },
+            { "CUTOFF",   PARAM_EXP,    20,   15000, 2500,   "Hz" },
+            { "Q",        PARAM_EXP,    0.5f, 20,    0.707f, ""   },
+            { "MIX",      PARAM_LINEAR, 0,    1,     0.4f,   "%"  },
+            { "LEVEL",    PARAM_LINEAR, 0,    1,     1,      "%"  },
+        },
+    },
+    [NODE_CHORUS] = {
+        // One-knob analog (BBD) style chorus: a short delay swept by a triangle LFO,
+        // darkened like a bucket-brigade chip and mixed 50/50 with the dry signal.
+        .name = "CHORUS", .has_input = true, .input_name = "AUDIO", .nparams = 4,
+        .params = {
+            { "RATE",  PARAM_EXP,    0.05f, 8, 0.8f, "Hz" },
+            { "DEPTH", PARAM_ENUM,   0,     1, 1,    "",  depth_types, 2 },
+            { "MIX",   PARAM_LINEAR, 0,     1, 0.5f, "%" },
+            { "LEVEL", PARAM_LINEAR, 0,     1, 1,    "%" },
+        },
+    },
+    [NODE_SAMPLE] = {
+        // Plays a .wav from sdmc:/3ds/nodeTrix/samples/ from START on every pulse.
+        .name = "SAMPLE", .has_input = false, .input_name = "", .nparams = 6,
+        .params = {
+            { "FILE",  PARAM_FILE,   0,   SAMPLES_MAX - 1, 0, "" },
+            { "PITCH", PARAM_LINEAR, -24, 24, 0,    "st" },
+            { "START", PARAM_LINEAR, 0,   1,  0,    "%"  },
+            { "END",   PARAM_LINEAR, 0,   1,  1,    "%"  },
+            { "LOOP",  PARAM_ENUM,   0,   1,  0,    "",  off_on, 2 },
+            { "LEVEL", PARAM_LINEAR, 0,   1,  0.8f, "%"  },
         },
     },
 };
@@ -151,11 +209,91 @@ static void gr_alloc(int i) {
 }
 static void gr_free(int i) { free(gr[i].buf); memset(&gr[i], 0, sizeof gr[i]); }
 
+// ------------------------------------------------------ filter / effects ---
+
+typedef struct {                // state-variable filter (TPT form)
+    float ic1, ic2;
+    float cut, q;               // what the coefficients were made for
+    float a1, a2, a3, k;
+    int   type;
+} Svf;
+
+static void svf_set(Svf *s, int type, float fc, float q) {
+    s->type = type;
+    if (fc == s->cut && q == s->q) return;
+    s->cut = fc; s->q = q;
+    float f = fc < 10 ? 10 : fc > SYN_SAMPLE_RATE * 0.47f ? SYN_SAMPLE_RATE * 0.47f : fc;
+    float g = tanf((float)M_PI * f / SYN_SAMPLE_RATE);
+    s->k = 1.0f / (q < 0.1f ? 0.1f : q);
+    s->a1 = 1.0f / (1.0f + g * (g + s->k));
+    s->a2 = g * s->a1;
+    s->a3 = g * s->a2;
+}
+
+static inline float svf_tick(Svf *s, float v0) {
+    float v3 = v0 - s->ic2;
+    float v1 = s->a1 * s->ic1 + s->a2 * v3;
+    float v2 = s->ic2 + s->a2 * s->ic1 + s->a3 * v3;
+    s->ic1 = 2 * v1 - s->ic1;
+    s->ic2 = 2 * v2 - s->ic2;
+    switch (s->type) {
+    case FT_HP:    return v0 - s->k * v1 - v2;
+    case FT_BP:    return s->k * v1;             // 0 dB at the centre
+    case FT_NOTCH: return v0 - s->k * v1;
+    default:       return v2;                    // LP
+    }
+}
+
+static inline float soft_clip(float x) {         // ~tanh, smooth up to |x| = 3
+    if (x > 3) x = 3;
+    if (x < -3) x = -3;
+    return x * (27 + x * x) / (27 + 9 * x * x);
+}
+
+#define DLY_BUF  (SYN_SAMPLE_RATE * 2 + 64)
+#define CHO_BUF  1024                             // 32 ms
+
+typedef struct { Svf f; } FilterState;
+typedef struct { float *buf; int w; float cur; Svf f; } DelayState;
+typedef struct { float buf[CHO_BUF]; int w; float ph; Svf bbd; } ChorusState;
+typedef struct { float pos; bool playing; } SampleState;
+
+static FilterState flt[SYN_MAX_NODES];
+static DelayState  dly[SYN_MAX_NODES];
+static ChorusState cho[SYN_MAX_NODES];
+static SampleState smp[SYN_MAX_NODES];
+
+static void dly_free(int i) { free(dly[i].buf); memset(&dly[i], 0, sizeof dly[i]); }
+static void dly_alloc(int i) {
+    float *b = dly[i].buf ? dly[i].buf : (float *)malloc(DLY_BUF * sizeof(float));
+    memset(&dly[i], 0, sizeof dly[i]);
+    dly[i].buf = b;
+    if (b) memset(b, 0, DLY_BUF * sizeof(float));
+}
+
+static void gr_alloc(int i);
+static void gr_free(int i);
+static void jc_clear(int i);
+
+// Fresh runtime state for node slot i (its buffers allocated for `type`).
+static void node_state_init(int i, int type) {
+    jc_clear(i);
+    memset(&flt[i], 0, sizeof flt[i]);
+    memset(&cho[i], 0, sizeof cho[i]);
+    memset(&smp[i], 0, sizeof smp[i]);
+    if (type == NODE_GRAINS) gr_alloc(i); else gr_free(i);
+    if (type == NODE_DELAY) dly_alloc(i); else dly_free(i);
+}
+static void node_state_free(int i) { gr_free(i); dly_free(i); }
+
 SynNode syn_nodes[SYN_MAX_NODES];
 static int order[SYN_MAX_NODES], norder = 0;    // evaluation order (inputs first)
 static volatile uint32_t pending_triggers = 0;
 
+static int file_count(void) { int n = samples_count(); return n < 1 ? 1 : n; }
+
 float syn_param_to_norm(const ParamDef *d, float v) {
+    if (d->kind == PARAM_FILE) return file_count() > 1 ? v / (file_count() - 1) : 0;
     if (d->kind == PARAM_EXP) return logf(v / d->min) / logf(d->max / d->min);
     return (v - d->min) / (d->max - d->min);
 }
@@ -164,6 +302,7 @@ float syn_norm_to_param(const ParamDef *d, float u) {
     if (u < 0) u = 0;
     if (u > 1) u = 1;
     if (d->kind == PARAM_EXP) return d->min * powf(d->max / d->min, u);
+    if (d->kind == PARAM_FILE) return floorf(u * (file_count() - 1) + 0.5f);
     if (d->kind == PARAM_ENUM) return floorf(d->min + u * (d->max - d->min) + 0.5f);
     return d->min + u * (d->max - d->min);
 }
@@ -201,8 +340,7 @@ static int add_node_locked(NodeType type, float x, float y) {
         n->outputs = 0;
         memset(n->mod_src, -1, sizeof n->mod_src);
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
-        jc_clear(i);
-        if (type == NODE_GRAINS) gr_alloc(i); else gr_free(i);
+        node_state_init(i, type);
         const NodeClass *c = &syn_classes[type];
         for (int k = 0; k < c->nparams; k++) n->p[k] = c->params[k].def;
         for (int k = 0; k < SYN_WT_SIZE; k++)        // default custom wave: a lopsided bump
@@ -236,7 +374,7 @@ int syn_add_copy(const SynNode *src, float x, float y) {
 void syn_delete_node(int i) {
     GRAPH_LOCK();
     syn_nodes[i].used = false;
-    gr_free(i);
+    node_state_free(i);
     for (int j = 0; j < SYN_MAX_NODES; j++)
         if (syn_nodes[j].input == i) syn_nodes[j].input = -1;
     rebuild();
@@ -284,9 +422,10 @@ void syn_set_mod_src(int node, int k, int seq) {
 }
 
 float syn_clamp_param(const ParamDef *d, float v) {
+    float hi = d->kind == PARAM_FILE ? file_count() - 1 : d->max;
     if (v < d->min) v = d->min;
-    if (v > d->max) v = d->max;
-    if (d->kind == PARAM_ENUM) v = floorf(v + 0.5f);
+    if (v > hi) v = hi;
+    if (d->kind == PARAM_ENUM || d->kind == PARAM_FILE) v = floorf(v + 0.5f);
     return v;
 }
 
@@ -309,8 +448,8 @@ void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
     for (int i = 0; i < SYN_MAX_NODES; i++) {
         SynNode *n = &syn_nodes[i];
         memset(n, 0, sizeof *n);
-        bool want_grains = src[i].used && src[i].type == NODE_GRAINS;
-        if (want_grains) gr_alloc(i); else gr_free(i);
+        if (src[i].used && src[i].type >= 0 && src[i].type < NODE_CLASS_COUNT) node_state_init(i, src[i].type);
+        else node_state_free(i);
         if (!src[i].used || src[i].type < 0 || src[i].type >= NODE_CLASS_COUNT) continue;
         n->used = true;
         n->type = src[i].type;
@@ -627,6 +766,165 @@ static inline void process_grains(SynNode *n, int idx, float input) {
     n->out_r = mix * r + dry;
 }
 
+// ----------------------------------------------------- FILTER/DELAY/CHORUS ---
+
+static inline float process_filter(SynNode *n, int idx, float in) {
+    FilterState *s = &flt[idx];
+    svf_set(&s->f, (int)n->p[FLT_TYPE], n->p[FLT_CUTOFF], n->p[FLT_Q]);
+    return svf_tick(&s->f, in) * n->p[FLT_LEVEL];
+}
+
+static inline float process_delay(SynNode *n, int idx, float in) {
+    DelayState *s = &dly[idx];
+    if (!s->buf) return in;
+    float target = n->p[DLY_TIME] * 0.001f * SYN_SAMPLE_RATE;
+    if (s->cur <= 0) s->cur = target;
+    s->cur += (target - s->cur) * 0.0006f;              // glide to a new TIME (~50 ms)
+    float d = s->cur < 1 ? 1 : s->cur > DLY_BUF - 4 ? DLY_BUF - 4 : s->cur;
+    float rp = (float)s->w - d;
+    if (rp < 0) rp += DLY_BUF;
+    int i0 = (int)rp, i1 = i0 + 1 >= DLY_BUF ? 0 : i0 + 1;
+    float fr = rp - i0;
+    float y = s->buf[i0] + (s->buf[i1] - s->buf[i0]) * fr;
+    svf_set(&s->f, (int)n->p[DLY_FTYPE], n->p[DLY_CUTOFF], n->p[DLY_Q]);
+    float wet = svf_tick(&s->f, y);                     // every repeat goes through the filter
+    s->buf[s->w] = soft_clip(in + n->p[DLY_FEEDBACK] * wet);
+    if (++s->w >= DLY_BUF) s->w = 0;
+    float mix = n->p[DLY_MIX];
+    return ((1 - mix) * in + mix * wet) * n->p[DLY_LEVEL];
+}
+
+static inline float process_chorus(SynNode *n, int idx, float in) {
+    ChorusState *s = &cho[idx];
+    s->ph += n->p[CHO_RATE] / SYN_SAMPLE_RATE;
+    if (s->ph >= 1) s->ph -= 1;
+    float tri = 4 * fabsf(s->ph - 0.5f) - 1;            // triangle LFO, -1..1
+    bool deep = n->p[CHO_DEPTH] >= 0.5f;
+    float ms = deep ? 6.5f + 4.5f * tri : 4.0f + 1.6f * tri;   // the depth switch
+    float d = ms * 0.001f * SYN_SAMPLE_RATE;
+    s->buf[s->w] = soft_clip(in * 1.2f) / 1.2f;          // a little BBD drive
+    float rp = (float)s->w - d;
+    if (rp < 0) rp += CHO_BUF;
+    int i0 = (int)rp, i1 = i0 + 1 >= CHO_BUF ? 0 : i0 + 1;
+    float fr = rp - i0;
+    float wet = s->buf[i0] + (s->buf[i1] - s->buf[i0]) * fr;
+    if (++s->w >= CHO_BUF) s->w = 0;
+    svf_set(&s->bbd, FT_LP, 5500, 0.6f);                // bucket-brigade darkening
+    wet = svf_tick(&s->bbd, wet);
+    float mix = n->p[CHO_MIX];
+    return ((1 - mix) * in + mix * wet) * n->p[CHO_LEVEL];
+}
+
+// ------------------------------------------------------------------ SAMPLE ---
+
+static inline float process_sample(SynNode *n, int idx) {
+    SampleState *s = &smp[idx];
+    int cnt = samples_count();
+    if (!s->playing || cnt < 1) return 0;
+    const Sample *sm = samples_get(((int)n->p[SMP_FILE] % cnt + cnt) % cnt);
+    float a = n->p[SMP_START], b = n->p[SMP_END];
+    if (b < a) { float t = a; a = b; b = t; }
+    float start = a * sm->len, end = b * sm->len;
+    if (end - start < 2) end = start + 2;
+    if (end > sm->len - 1) end = (float)(sm->len - 1);
+    if (s->pos < start) s->pos = start;
+    if (s->pos >= end) {
+        if (n->p[SMP_LOOP] >= 0.5f && end - start >= 2) s->pos = start;
+        else { s->playing = false; return 0; }
+    }
+    int i0 = (int)s->pos;
+    float fr = s->pos - i0;
+    float v = (sm->data[i0] + (sm->data[i0 + 1] - sm->data[i0]) * fr) * (1.0f / 32768.0f);
+    s->pos += (float)sm->rate / SYN_SAMPLE_RATE * exp2f(n->p[SMP_PITCH] / 12.0f);
+    return v * n->p[SMP_LEVEL];
+}
+
+static void sample_trigger(SynNode *n, int idx) {
+    smp[idx].playing = true;
+    smp[idx].pos = 0;                                   // clamped up to START on the next sample
+    (void)n;
+}
+
+// --------------------------------------------------------------------- MIC ---
+
+#ifdef __3DS__
+#define MIC_SHMEM   0x30000
+static u8 *mic_buf = NULL;
+static u32 mic_bytes = 0;                               // sample data size inside mic_buf
+static volatile bool mic_running = false;
+static u32 mic_wr = 0;                                  // writer position (samples), read once per block
+static float mic_rp = 0;
+#endif
+static float mic_x1 = 0, mic_y1 = 0;                    // DC blocker
+
+static inline float process_mic(SynNode *n) {
+    float x = 0;
+#ifdef __3DS__
+    if (mic_running && mic_bytes) {
+        u32 ns = mic_bytes / 2;
+        float dist = (float)mic_wr - mic_rp;
+        if (dist < 0) dist += ns;
+        if (dist < 32 || dist > 4000) {                 // (re)start ~25 ms behind the writer
+            mic_rp = (float)mic_wr - 800;
+            if (mic_rp < 0) mic_rp += ns;
+        }
+        const int16_t *pcm = (const int16_t *)mic_buf;
+        int i0 = (int)mic_rp, i1 = (u32)(i0 + 1) >= ns ? 0 : i0 + 1;
+        float fr = mic_rp - i0;
+        x = (pcm[i0] + (pcm[i1] - pcm[i0]) * fr) * (1.0f / 32768.0f);
+        mic_rp += 32730.0f / SYN_SAMPLE_RATE;           // the mic runs at 32.73 kHz
+        if (mic_rp >= ns) mic_rp -= ns;
+    }
+#endif
+    float y = x - mic_x1 + 0.995f * mic_y1;
+    mic_x1 = x; mic_y1 = y;
+    return y * n->p[MIC_GAIN];
+}
+
+static bool any_mic_node(void) {
+    for (int i = 0; i < SYN_MAX_NODES; i++)
+        if (syn_nodes[i].used && syn_nodes[i].type == NODE_MIC) return true;
+    return false;
+}
+
+#ifdef __3DS__
+void syn_mic_poll(void) {
+    bool want = any_mic_node();
+    if (want && !mic_running) {
+        if (!mic_buf) mic_buf = (u8 *)memalign(0x1000, MIC_SHMEM);
+        if (!mic_buf) return;
+        if (R_FAILED(micInit(mic_buf, MIC_SHMEM))) return;
+        mic_bytes = micGetSampleDataSize();
+        if (R_FAILED(MICU_StartSampling(MICU_ENCODING_PCM16_SIGNED, MICU_SAMPLE_RATE_32730, 0, mic_bytes, true))) {
+            micExit();
+            return;
+        }
+        mic_wr = micGetLastSampleOffset() / 2;
+        mic_rp = (float)mic_wr;
+        GRAPH_LOCK();
+        mic_running = true;
+        GRAPH_UNLOCK();
+    } else if (!want && mic_running) {
+        syn_mic_stop();
+    }
+}
+
+void syn_mic_stop(void) {
+    if (!mic_running) return;
+    GRAPH_LOCK();                                       // audio thread stops reading first
+    mic_running = false;
+    GRAPH_UNLOCK();
+    MICU_StopSampling();
+    micExit();
+}
+
+bool syn_mic_on(void) { return mic_running; }
+#else
+void syn_mic_poll(void) { (void)any_mic_node; }
+void syn_mic_stop(void) {}
+bool syn_mic_on(void) { return false; }
+#endif
+
 void syn_render(int16_t *out, int nframes) {
     GRAPH_LOCK();
     uint32_t trig = __atomic_exchange_n(&pending_triggers, 0, __ATOMIC_SEQ_CST);
@@ -635,8 +933,12 @@ void syn_render(int16_t *out, int nframes) {
             SynNode *n = &syn_nodes[i];
             if (n->used && n->type == NODE_ENV && (n->trig_mask & trig)) env_gate(n);
             if (n->used && n->type == NODE_GRAINS && (n->trig_mask & trig)) gr[i].seed = true;
+            if (n->used && n->type == NODE_SAMPLE && (n->trig_mask & trig)) sample_trigger(n, i);
         }
 
+#ifdef __3DS__
+    if (mic_running) mic_wr = micGetLastSampleOffset() / 2;
+#endif
     for (int s = 0; s < nframes; s++) {
         float mix = 0, mix_r = 0;
         for (int o = 0; o < norder; o++) {
@@ -651,6 +953,11 @@ void syn_render(int16_t *out, int nframes) {
             case NODE_OSC:   n->out = process_osc(n, in, has_in); break;
             case NODE_REVERB: process_reverb(n, order[o], in); break;
             case NODE_GRAINS:  process_grains(n, order[o], in); break;
+            case NODE_MIC:     n->out = process_mic(n); break;
+            case NODE_FILTER:  n->out = process_filter(n, order[o], in); break;
+            case NODE_DELAY:   n->out = process_delay(n, order[o], in); break;
+            case NODE_CHORUS:  n->out = process_chorus(n, order[o], in); break;
+            case NODE_SAMPLE:  n->out = process_sample(n, order[o]); break;
             default:         n->out = 0;
             }
             if (n->outputs) {
