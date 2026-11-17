@@ -24,6 +24,7 @@ static const char *const dir_types[]   = { "FWD", "REV", "BOTH" };
 static const char *const off_on[]      = { "OFF", "ON" };
 static const char *const flt_types[]   = { "LP", "HP", "BP", "NOTCH" };
 static const char *const depth_types[] = { "LOW", "HIGH" };
+static const char *const xf_curves[]   = { "LIN", "EQ PWR" };
 
 const NodeClass syn_classes[NODE_CLASS_COUNT] = {
     [NODE_NOISE] = {
@@ -135,6 +136,18 @@ const NodeClass syn_classes[NODE_CLASS_COUNT] = {
             { "END",   PARAM_LINEAR, 0,   1,  1,    "%"  },
             { "LOOP",  PARAM_ENUM,   0,   1,  0,    "",  off_on, 2 },
             { "LEVEL", PARAM_LINEAR, 0,   1,  0.8f, "%"  },
+        },
+    },
+    [NODE_XFADE] = {
+        // Crossfades between input A (MIX 0%) and input B (MIX 100%). LIN gains
+        // (1-m, m) dip ~3 dB in the middle for unrelated sounds; EQ PWR (cos, sin)
+        // keeps the loudness steady. Stereo inputs stay stereo.
+        .name = "XFADE", .has_input = true, .input_name = "A", .has_input2 = true, .input2_name = "B",
+        .stereo = true, .nparams = 3,
+        .params = {
+            { "MIX",   PARAM_LINEAR, 0, 1, 0.5f, "%" },
+            { "CURVE", PARAM_ENUM,   0, 1, 1,    "", xf_curves, 2 },
+            { "LEVEL", PARAM_LINEAR, 0, 1, 1,    "%" },
         },
     },
 };
@@ -307,15 +320,41 @@ float syn_norm_to_param(const ParamDef *d, float u) {
     return d->min + u * (d->max - d->min);
 }
 
-// Recompute evaluation order and which tracks gate which envelopes.
-// Caller holds the graph lock.
+static bool valid_src(int j) { return j >= 0 && j < SYN_MAX_NODES && syn_nodes[j].used; }
+
+// Is `target` reachable by walking upstream (through both inputs) from `from`?
+static bool upstream_has(int from, int target) {
+    int stack[2 * SYN_MAX_NODES + 2], sp = 0;
+    bool seen[SYN_MAX_NODES] = { false };
+    stack[sp++] = from;
+    while (sp) {
+        int j = stack[--sp];
+        if (!valid_src(j) || seen[j]) continue;
+        if (j == target) return true;
+        seen[j] = true;
+        stack[sp++] = syn_nodes[j].input;
+        stack[sp++] = syn_nodes[j].input2;
+    }
+    return false;
+}
+
+// Recompute evaluation order (every node after its inputs) and which tracks
+// gate which envelopes (everything upstream of an output). Caller holds the lock.
 static void rebuild(void) {
-    int depth[SYN_MAX_NODES];
-    for (int i = 0; i < SYN_MAX_NODES; i++) {
-        depth[i] = 0;
-        syn_nodes[i].trig_mask = 0;
-        if (!syn_nodes[i].used) continue;
-        for (int j = syn_nodes[i].input; j >= 0 && depth[i] < SYN_MAX_NODES; j = syn_nodes[j].input) depth[i]++;
+    int depth[SYN_MAX_NODES] = { 0 };
+    for (int i = 0; i < SYN_MAX_NODES; i++) syn_nodes[i].trig_mask = 0;
+    for (int pass = 0; pass < SYN_MAX_NODES; pass++) {    // longest path from a source
+        bool changed = false;
+        for (int i = 0; i < SYN_MAX_NODES; i++) {
+            if (!syn_nodes[i].used) continue;
+            int ins[2] = { syn_nodes[i].input, syn_nodes[i].input2 };
+            for (int p = 0; p < 2; p++)
+                if (valid_src(ins[p]) && depth[ins[p]] + 1 > depth[i] && depth[ins[p]] + 1 < SYN_MAX_NODES) {
+                    depth[i] = depth[ins[p]] + 1;
+                    changed = true;
+                }
+        }
+        if (!changed) break;
     }
     norder = 0;
     for (int d = 0; d < SYN_MAX_NODES; d++)
@@ -324,7 +363,8 @@ static void rebuild(void) {
     for (int i = 0; i < SYN_MAX_NODES; i++) {
         SynNode *n = &syn_nodes[i];
         if (!n->used || !n->outputs) continue;
-        for (int j = i; j >= 0; j = syn_nodes[j].input) syn_nodes[j].trig_mask |= n->outputs;
+        for (int j = 0; j < SYN_MAX_NODES; j++)
+            if (syn_nodes[j].used && upstream_has(i, j)) syn_nodes[j].trig_mask |= n->outputs;
     }
 }
 
@@ -336,7 +376,7 @@ static int add_node_locked(NodeType type, float x, float y) {
         n->used = true;
         n->type = type;
         n->x = x; n->y = y;
-        n->input = -1;
+        n->input = n->input2 = -1;
         n->outputs = 0;
         memset(n->mod_src, -1, sizeof n->mod_src);
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
@@ -376,29 +416,41 @@ void syn_delete_node(int i) {
     syn_nodes[i].used = false;
     node_state_free(i);
     for (int j = 0; j < SYN_MAX_NODES; j++)
+    {
         if (syn_nodes[j].input == i) syn_nodes[j].input = -1;
+        if (syn_nodes[j].input2 == i) syn_nodes[j].input2 = -1;
+    }
     rebuild();
     GRAPH_UNLOCK();
 }
 
-bool syn_connect(int src, int dst) {
-    if (src == dst || src < 0 || dst < 0) return false;
+bool syn_connect_port(int src, int dst, int port) {
+    if (src == dst || src < 0 || dst < 0 || src >= SYN_MAX_NODES || dst >= SYN_MAX_NODES) return false;
     if (!syn_nodes[src].used || !syn_nodes[dst].used) return false;
-    if (!syn_classes[syn_nodes[dst].type].has_input) return false;
-    for (int j = src; j >= 0; j = syn_nodes[j].input)     // would create a loop?
-        if (j == dst) return false;
+    const NodeClass *c = &syn_classes[syn_nodes[dst].type];
+    if (port == 0 ? !c->has_input : port == 1 ? !c->has_input2 : true) return false;
+    if (upstream_has(src, dst)) return false;             // would create a loop
     GRAPH_LOCK();
-    syn_nodes[dst].input = src;
+    if (port == 0) syn_nodes[dst].input = src; else syn_nodes[dst].input2 = src;
     rebuild();
     GRAPH_UNLOCK();
     return true;
 }
 
-void syn_disconnect(int dst) {
+bool syn_connect(int src, int dst) { return syn_connect_port(src, dst, 0); }
+
+void syn_disconnect_port(int dst, int port) {
     GRAPH_LOCK();
-    syn_nodes[dst].input = -1;
+    if (port == 0) syn_nodes[dst].input = -1; else syn_nodes[dst].input2 = -1;
     rebuild();
     GRAPH_UNLOCK();
+}
+
+void syn_disconnect(int dst) { syn_disconnect_port(dst, 0); }
+
+int syn_node_input(int node, int port) {
+    if (node < 0 || node >= SYN_MAX_NODES || !syn_nodes[node].used) return -1;
+    return port == 0 ? syn_nodes[node].input : syn_nodes[node].input2;
 }
 
 void syn_set_param(int node, int k, float v) {
@@ -457,21 +509,23 @@ void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
         memcpy(n->p, src[i].p, sizeof n->p);
         memcpy(n->wt, src[i].wt, sizeof n->wt);
         n->input = src[i].input;
+        n->input2 = src[i].input2;
         n->outputs = src[i].outputs & 0x1F;
         for (int k = 0; k < SYN_MAX_PARAMS; k++)
             n->mod_src[k] = (src[i].mod_src[k] >= 0 && src[i].mod_src[k] < 8) ? src[i].mod_src[k] : -1;
         n->rng = 0x9E3779B9u * (uint32_t)(i + 1);
         jc_clear(i);
     }
-    for (int i = 0; i < SYN_MAX_NODES; i++) {          // drop links to missing nodes / loops
+    for (int i = 0; i < SYN_MAX_NODES; i++) {          // drop links to missing nodes / missing ports
         SynNode *n = &syn_nodes[i];
-        if (!n->used || n->input < 0) continue;
-        if (n->input >= SYN_MAX_NODES || !syn_nodes[n->input].used || !syn_classes[n->type].has_input) n->input = -1;
+        if (!n->used) continue;
+        if (!valid_src(n->input) || !syn_classes[n->type].has_input) n->input = -1;
+        if (!valid_src(n->input2) || !syn_classes[n->type].has_input2) n->input2 = -1;
     }
-    for (int i = 0; i < SYN_MAX_NODES; i++) {
-        int steps = 0;
-        for (int j = syn_nodes[i].input; j >= 0 && steps <= SYN_MAX_NODES; j = syn_nodes[j].input) steps++;
-        if (steps > SYN_MAX_NODES) syn_nodes[i].input = -1;
+    for (int i = 0; i < SYN_MAX_NODES; i++) {          // ... and links that close a loop
+        SynNode *n = &syn_nodes[i];
+        if (n->used && upstream_has(n->input2, i)) n->input2 = -1;
+        if (n->used && upstream_has(n->input, i)) n->input = -1;
     }
     rebuild();
     GRAPH_UNLOCK();
@@ -489,6 +543,78 @@ void syn_init(void) {
     syn_nodes[e].input = n;
     syn_nodes[e].outputs = 1u << 0;
     rebuild();
+}
+
+// ------------------------------------------------------- sequencer slew ---
+// Each S1..S8 output glides from its last value to the new one. LIN is a
+// straight line; LOG moves fast at first and eases in (log(1+Kt)/log(1+K)).
+// Both arrive in exactly slew_ms. Applied every MOD_BLOCK samples (1 ms).
+
+#define MOD_BLOCK 32
+#define SLEW_LOG_K 30.0f
+
+typedef struct {
+    bool  have, active;
+    float from, to, cur;
+    float t, dt;               // progress 0..1, per sample
+    int   curve;
+} ModSlew;
+
+static ModSlew mslew[SYN_MOD_SEQS];
+
+float syn_slew_shape(int curve, float t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    if (curve == SLEW_LOG) return logf(1.0f + SLEW_LOG_K * t) / logf(1.0f + SLEW_LOG_K);
+    return t;
+}
+
+static void mod_apply(int seq, float v) {               // caller holds the lock
+    for (int n = 0; n < SYN_MAX_NODES; n++) {
+        SynNode *node = &syn_nodes[n];
+        if (!node->used) continue;
+        const NodeClass *cls = &syn_classes[node->type];
+        for (int k = 0; k < cls->nparams; k++)
+            if (node->mod_src[k] == seq) node->p[k] = syn_clamp_param(&cls->params[k], v);
+    }
+}
+
+void syn_mod_target(int seq, float value, float slew_ms, int curve) {
+    if (seq < 0 || seq >= SYN_MOD_SEQS) return;
+    GRAPH_LOCK();
+    ModSlew *m = &mslew[seq];
+    float samples = slew_ms * SYN_SAMPLE_RATE / 1000.0f;
+    if (!m->have || samples < 1) {                      // first value, or no slew: jump
+        m->cur = m->to = value;
+        m->active = false;
+        mod_apply(seq, value);
+    } else {
+        m->from = m->cur;
+        m->to = value;
+        m->t = 0;
+        m->dt = 1.0f / samples;
+        m->curve = curve;
+        m->active = true;
+    }
+    m->have = true;
+    GRAPH_UNLOCK();
+}
+
+void syn_mod_reset(void) {
+    GRAPH_LOCK();
+    for (int i = 0; i < SYN_MOD_SEQS; i++) mslew[i].have = mslew[i].active = false;
+    GRAPH_UNLOCK();
+}
+
+static void mod_tick(int nsamples) {                    // audio thread, lock held
+    for (int i = 0; i < SYN_MOD_SEQS; i++) {
+        ModSlew *m = &mslew[i];
+        if (!m->active) continue;
+        m->t += m->dt * nsamples;
+        if (m->t >= 1) { m->t = 1; m->active = false; }
+        m->cur = m->from + (m->to - m->from) * syn_slew_shape(m->curve, m->t);
+        mod_apply(i, m->cur);
+    }
 }
 
 void syn_trigger(int track) {
@@ -845,6 +971,33 @@ static void sample_trigger(SynNode *n, int idx) {
     (void)n;
 }
 
+// ------------------------------------------------------------------- XFADE ---
+
+static struct { float m; int curve; float ga, gb; bool set; } xf[SYN_MAX_NODES];   // cached gains
+
+static inline void src_lr(int j, float *l, float *r) {
+    if (j < 0) { *l = *r = 0; return; }
+    const SynNode *s = &syn_nodes[j];
+    *l = s->out;
+    *r = syn_classes[s->type].stereo ? s->out_r : s->out;
+}
+
+static inline void process_xfade(SynNode *n, int idx) {
+    float m = n->p[XF_MIX];
+    int curve = (int)n->p[XF_CURVE];
+    if (!xf[idx].set || m != xf[idx].m || curve != xf[idx].curve) {
+        xf[idx].m = m; xf[idx].curve = curve; xf[idx].set = true;
+        if (curve == XC_EQPOWER) { xf[idx].ga = cosf(m * (0.5f * (float)M_PI)); xf[idx].gb = sinf(m * (0.5f * (float)M_PI)); }
+        else { xf[idx].ga = 1.0f - m; xf[idx].gb = m; }
+    }
+    float al, ar, bl, br;
+    src_lr(n->input, &al, &ar);
+    src_lr(n->input2, &bl, &br);
+    float lvl = n->p[XF_LEVEL];
+    n->out   = (al * xf[idx].ga + bl * xf[idx].gb) * lvl;
+    n->out_r = (ar * xf[idx].ga + br * xf[idx].gb) * lvl;
+}
+
 // --------------------------------------------------------------------- MIC ---
 
 #ifdef __3DS__
@@ -940,6 +1093,7 @@ void syn_render(int16_t *out, int nframes) {
     if (mic_running) mic_wr = micGetLastSampleOffset() / 2;
 #endif
     for (int s = 0; s < nframes; s++) {
+        if (s % MOD_BLOCK == 0) mod_tick(nframes - s < MOD_BLOCK ? nframes - s : MOD_BLOCK);
         float mix = 0, mix_r = 0;
         for (int o = 0; o < norder; o++) {
             SynNode *n = &syn_nodes[order[o]];
@@ -958,6 +1112,7 @@ void syn_render(int16_t *out, int nframes) {
             case NODE_DELAY:   n->out = process_delay(n, order[o], in); break;
             case NODE_CHORUS:  n->out = process_chorus(n, order[o], in); break;
             case NODE_SAMPLE:  n->out = process_sample(n, order[o]); break;
+            case NODE_XFADE:   process_xfade(n, order[o]); break;
             default:         n->out = 0;
             }
             if (n->outputs) {

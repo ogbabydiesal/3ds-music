@@ -5,17 +5,22 @@
 // the last). Its value  MIN + (MAX - MIN) * slider  is written to every synth
 // parameter assigned to it; assignments are made per parameter in the node's
 // settings box on the SYNTH page. Values are clamped to each parameter's range.
+// SLEW glides each new value in over that many milliseconds, along a LIN
+// (straight) or LOG (fast, then easing in) curve; 0 ms jumps.
 #pragma once
 #include <stdbool.h>
 
 #define MOD_SEQS       8
 #define MOD_MAX_STEPS  16
+#define MOD_MAX_SLEW   10000.0f   // ms
 
 typedef struct {
     int   trig;                 // shape 0..4 whose pulses advance it
     int   nsteps;               // 1..MOD_MAX_STEPS
     float min, max;             // output range, plain numbers
     float v[MOD_MAX_STEPS];     // slider positions 0..1
+    float slew_ms;              // 0..MOD_MAX_SLEW
+    int   slew_curve;           // SLEW_LIN / SLEW_LOG (synth.h)
     volatile int cur;           // last played step, -1 = none yet
 } ModSeq;
 

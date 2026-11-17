@@ -24,7 +24,7 @@ The starter patch is **NOISE (white) → ENV**, with the ENV output on shape 1 (
 
 ## Nodes
 
-Every node has a **LEVEL**, and any node can be an output. Each node has at most **one input** and can feed any number of other nodes.
+Every node has a **LEVEL**, and any node can be an output. Most nodes have **one input**; XFADE has two (A and B). **Any output can feed any number of inputs**: drag another cable from the same output square for each destination.
 
 ### OSC: oscillator
 
@@ -138,6 +138,23 @@ A **one-knob analog chorus** in the style of the bucket-brigade pedals of the ea
 |---|---|
 | ![SAMPLE settings](screenshots/synth-13-sample-settings.png) | ![CHORUS settings](screenshots/synth-14-chorus-settings.png) |
 
+### XFADE: crossfader
+
+Takes **two inputs, A and B**, and blends between them. A is the top input square, B the bottom (labelled on the canvas from 70% zoom). Dropping a cable on the node's body fills A first, then B.
+
+| Setting | Range | Notes |
+|---|---|---|
+| MIX | 0–100% | 0% is only A, 100% only B. Put it on an **S box** to switch or sweep between two sounds in time with a shape; add SLEW on the STEPS page for smooth fades. |
+| CURVE | LIN / EQ PWR | **LIN** gains are 1−MIX and MIX, so two unrelated sounds dip about 3 dB in loudness in the middle. **EQ PWR** (cos/sin) keeps loudness steady through the fade. |
+| LEVEL | 0–100% | |
+
+**Stereo:** a stereo source (REVERB, GRAINS, or another XFADE) on either input stays stereo through the XFADE. An empty input is silence. Pulses reach envelopes on **both** branches.
+
+| ![ENV fans out to LP and HP FILTERs, blended by XFADE into REVERB](screenshots/synth-15-xfade.png) | ![XFADE settings, MIX on S3](screenshots/synth-16-xfade-settings.png) |
+|---|---|
+
+Above, one ENV feeds **two** FILTERs (LP 600 Hz and HP 2.5 kHz), and the XFADE blends them. S3 steps MIX with a 180 ms LOG slew, so each pulse morphs the tone between dark and bright.
+
 ### REVERB: JCRev
 
 A port of the **JCRev** reverb from Stanford's [Synthesis ToolKit (STK)](https://ccrma.stanford.edu/software/stk/classstk_1_1JCRev.html), based on John Chowning's classic reverb design. It follows STK's `JCRev::tick` step for step:
@@ -210,6 +227,7 @@ On the canvas, an output node has a white outline and a small coloured square fo
 ## Patching
 
 - **Connect:** drag from a node's **output** square (right edge) to another node's **input** square (left edge). Dropping on the node's body also works.
+- **One output, many inputs:** drag again from the same output square to patch it into more nodes. Every cable carries the same signal; existing cables stay.
 - **Unplug or re-route:** drag a cable off an input square. It stays attached to your finger, so you can drop it on another input or let go in empty space to remove it.
 - **Move:** drag a node by its body.
 - Connections that would create a loop are refused.
@@ -223,7 +241,7 @@ On the canvas, an output node has a white outline and a small coloured square fo
 
 ## Selecting, copying and pasting
 
-**Box select:** with the toolbar on **BOX**, drag on empty canvas to draw a rectangle. Every node it touches is selected, shown with a green outline. Tapping empty canvas clears the selection.
+**Box select:** with the toolbar on **BOX**, drag (a single touch) on empty canvas to draw a rectangle. Every node it touches is selected, shown with a green outline. Tapping empty canvas clears the selection.
 
 ![Box select in progress](screenshots/synth-5-box-select.png)
 
@@ -239,11 +257,14 @@ Here the kick chain was copied and pasted, dragged below the original, retuned t
 ## Zoom and pan
 
 - **Zoom:** **−** / **+** in the toolbar, or **L** / **R**, from 40% to 250%. Tap the **%** to fit all nodes.
-- **Pan:** switch the toolbar to **PAN** and drag on empty canvas, or hold the **D-pad**.
+- **Pan:** **double-tap and hold** anywhere on the canvas, even on a node or cable, then drag. Or switch the toolbar to **PAN** and drag on empty canvas, or hold the **D-pad**.
+  - The second tap has to come within about a quarter of a second, near the first. Because of this, a single tap on a node opens its settings after that short pause.
 
 ## Stepping parameters
 
-Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** page. Assign it with the setting's **S box** here, then set that sequencer's trigger shape, MIN/MAX numbers and sliders on the STEPS page. See the README's STEPS section.
+Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** page. Assign it with the setting's **S box** here, then set that sequencer's trigger shape, MIN/MAX numbers, SLEW and sliders on the STEPS page. One sequencer can drive any number of settings on any nodes. See the README's STEPS section.
+
+**SLEW** makes each new step glide in over that many milliseconds instead of jumping: **LIN** moves in a straight line; **LOG** moves fast at first and eases into the new value. Both arrive in exactly the SLEW time. If a new step comes before the glide ends, it carries on from wherever it got to. Use it for portamento (on FREQ), filter swoops (CUTOFF) and crossfades (XFADE MIX).
 
 ## Sound output
 
@@ -271,3 +292,6 @@ Any setting can follow one of the 8 step sequencers (S1–S8) on the **STEPS** p
 | Grunge clean | OSC → ENV → CHORUS → REVERB | SQR 196 Hz; CHORUS RATE 1 Hz, HIGH, MIX 50%; REVERB T60 1.5 s |
 | Voice cloud | MIC → GRAINS → REVERB | headphones; GRAINS SIZE 300 ms, DENSITY +60%, RANDOM 40% |
 | Stutter hits | NOISE → ENV → GRAINS | GRAINS DENSITY 0 (one grain per pulse), SIZE 60 ms, SHAPE 0%, TIME 10% |
+| Glide bass | OSC → ENV | SAW; FREQ on S1 (MIN 55, MAX 220), STEPS SLEW 80 ms LOG |
+| Tone morph | OSC → ENV → FILTER LP + FILTER HP → XFADE | the ENV feeds both FILTERs; XFADE MIX on S2 with SLEW 200 ms LIN |
+| Dry/wet switch | SAMPLE → XFADE A, SAMPLE → GRAINS → XFADE B | XFADE EQ PWR; MIX on S3 (sliders at 0 or 1) to flip between clean and granular per pulse |

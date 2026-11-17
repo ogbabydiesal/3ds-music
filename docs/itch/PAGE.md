@@ -57,6 +57,7 @@ Five wireframe shapes (a cube, a sphere, a pyramid, a diamond and a cylinder) or
 - **FILTER**: a resonant low-pass, high-pass, band-pass or notch filter
 - **DELAY**: up to 2 s of feedback delay with a filter in the loop and tape-style time glides
 - **CHORUS**: a one-knob analog-style chorus with a depth switch, for that watery early-'90s clean tone
+- **XFADE**: blend two signals, with MIX sequenceable for crossfades and switches
 - **REVERB**: a port of John Chowning's classic JCRev reverb from Stanford's STK
 - **GRAINS**: a granular texture processor, an implementation of the Mutable Instruments Beads algorithm. It records, freezes, pitch-shifts, reverses and scatters grains in stereo.
 - Box select, copy and paste, and patches saved with your patterns
@@ -64,6 +65,7 @@ Five wireframe shapes (a cube, a sphere, a pyramid, a diamond and a cylinder) or
 **8 step sequencers**
 - S1–S8 each step through up to 16 sliders on a shape's pulses
 - Assign any synth setting to any sequencer, right in the instrument's settings
+- Linear or logarithmic SLEW for glides, swoops and smooth crossfades
 
 **OSC out**
 - `/shape_N/pulse` on every hit, plus optional gyro and accelerometer streams

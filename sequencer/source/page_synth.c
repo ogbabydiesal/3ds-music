@@ -66,7 +66,15 @@ static bool  pan_mode = false;                    // empty-canvas drag: false = 
 static bool  selected[SYN_MAX_NODES];
 
 static SynNode clip[SYN_MAX_NODES];
-static int   clip_input[SYN_MAX_NODES], nclip = 0, paste_count = 0;
+static int   clip_input[SYN_MAX_NODES][2], nclip = 0, paste_count = 0;
+
+// Double-tap and hold anywhere on the canvas pans. A tap on a node waits
+// DT_FRAMES before opening its settings, in case a second tap follows.
+#define DT_FRAMES 15                        // ~250 ms at 60 fps
+#define DT_DIST   24                        // px between the two taps
+static int   frame = 0;
+static int   last_tap_frame = -1000, last_tap_x, last_tap_y;
+static int   pending_popup = -1, pending_frame = 0;
 
 bool synth_page_popup_open(void) { return popup >= 0; }
 void synth_page_open_popup(int node) { if (node >= 0 && node < SYN_MAX_NODES && syn_nodes[node].used) popup = node; }
@@ -85,7 +93,13 @@ static bool in_canvas(int x, int y) { return in_rect(x, y, CV_X, CV_Y, CV_W, CV_
 
 static float node_sx(const SynNode *n) { return sx(n->x); }
 static float node_sy(const SynNode *n) { return sy(n->y); }
-static float port_sy(const SynNode *n) { return sy(n->y + NODE_H / 2.0f); }
+static float port_sy(const SynNode *n) { return sy(n->y + NODE_H / 2.0f); }   // output port
+// Input ports: centred, or A above B for two-input nodes (XFADE)
+static float in_port_sy(const SynNode *n, int port) {
+    if (!syn_classes[n->type].has_input2) return port_sy(n);
+    return sy(n->y + NODE_H * (port ? 0.75f : 0.25f));
+}
+static int node_in(const SynNode *n, int port) { return port ? n->input2 : n->input; }
 
 static int node_at(int x, int y) {
     for (int i = SYN_MAX_NODES - 1; i >= 0; i--)
@@ -102,13 +116,19 @@ static int out_port_at(int x, int y) {
     return -1;
 }
 
-static int in_port_at(int x, int y) {
+// Nearest input port within reach; *port says which (0 = A, 1 = B).
+static int in_port_at(int x, int y, int *port) {
+    int best = -1;
+    float best_d = 1e9f;
     for (int i = SYN_MAX_NODES - 1; i >= 0; i--) {
         const SynNode *n = &syn_nodes[i];
-        if (n->used && syn_classes[n->type].has_input &&
-            fabsf(x - sx(n->x)) <= PORT_HIT && fabsf(y - port_sy(n)) <= PORT_HIT) return i;
+        if (!n->used || !syn_classes[n->type].has_input) continue;
+        for (int p = 0; p < (syn_classes[n->type].has_input2 ? 2 : 1); p++) {
+            float dx = fabsf(x - sx(n->x)), dy = fabsf(y - in_port_sy(n, p));
+            if (dx <= PORT_HIT && dy <= PORT_HIT && dx + dy < best_d) { best = i; best_d = dx + dy; if (port) *port = p; }
+        }
     }
-    return -1;
+    return best;
 }
 
 static void clear_selection(void) { memset(selected, 0, sizeof selected); }
@@ -176,7 +196,10 @@ static void copy_selection(void) {
         if (syn_nodes[i].used && selected[i]) { map[i] = nclip; clip[nclip++] = syn_nodes[i]; }
     }
     for (int k = 0; k < nclip; k++)                 // keep only links inside the selection
-        clip_input[k] = clip[k].input >= 0 ? map[clip[k].input] : -1;
+        for (int p = 0; p < 2; p++) {
+            int src = node_in(&clip[k], p);
+            clip_input[k][p] = src >= 0 && src < SYN_MAX_NODES ? map[src] : -1;
+        }
     paste_count = 0;
 }
 
@@ -190,7 +213,9 @@ static void paste_clip(void) {
         if (idx[k] >= 0) selected[idx[k]] = true;
     }
     for (int k = 0; k < nclip; k++)
-        if (idx[k] >= 0 && clip_input[k] >= 0 && idx[clip_input[k]] >= 0) syn_connect(idx[clip_input[k]], idx[k]);
+        for (int p = 0; p < 2; p++)
+            if (idx[k] >= 0 && clip_input[k][p] >= 0 && idx[clip_input[k][p]] >= 0)
+                syn_connect_port(idx[clip_input[k][p]], idx[k], p);
 }
 
 static void delete_selection(void) {
@@ -318,7 +343,8 @@ void synth_page_draw_popup(void) {
     rect_outline(POP_X, py, POP_W, ph, COL_LINE);
 
     text(POP_X + 8, py + 5, 0.5f, COL_FG, 0, "%s %d", c->name, node + 1);
-    if (c->has_input) text(POP_X + POP_W - 8, py + 7, 0.36f, COL_DIM, C2D_AlignRight, "input: %s", c->input_name);
+    if (c->has_input2) text(POP_X + POP_W - 8, py + 7, 0.36f, COL_DIM, C2D_AlignRight, "inputs: %s (top), %s", c->input_name, c->input2_name);
+    else if (c->has_input) text(POP_X + POP_W - 8, py + 7, 0.36f, COL_DIM, C2D_AlignRight, "input: %s", c->input_name);
 
     float rh = prow_h(node), ty = rh < POP_ROW_H ? 1 : 3, ns = rh < POP_ROW_H ? 0.37f : 0.4f;
     for (int k = 0; k < c->nparams; k++) {
@@ -425,7 +451,7 @@ static void toolbar_touch_down(int x) {
 // Display order for the carousel: sources, then shapers, then effects
 static const NodeType car_order[NODE_CLASS_COUNT] = {
     NODE_OSC, NODE_NOISE, NODE_SAMPLE, NODE_MIC, NODE_ENV, NODE_FILTER,
-    NODE_DELAY, NODE_CHORUS, NODE_REVERB, NODE_GRAINS,
+    NODE_XFADE, NODE_DELAY, NODE_CHORUS, NODE_REVERB, NODE_GRAINS,
 };
 
 void synth_page_touch(bool down, bool held, bool up, int x, int y) {
@@ -439,11 +465,19 @@ void synth_page_touch(bool down, bool held, bool up, int x, int y) {
         if (y >= TB_Y && y < TB_Y + TB_H) { toolbar_touch_down(x); return; }
         if (!in_canvas(x, y)) return;
 
-        int i;
+        if (frame - last_tap_frame <= DT_FRAMES &&            // second tap of a double tap: pan
+            abs(x - last_tap_x) <= DT_DIST && abs(y - last_tap_y) <= DT_DIST) {
+            pending_popup = -1;
+            last_tap_frame = -1000;
+            drag = DRAG_PAN;
+            return;
+        }
+
+        int i, port = 0;
         if ((i = out_port_at(x, y)) >= 0) { drag = DRAG_WIRE; drag_node = i; return; }
-        if ((i = in_port_at(x, y)) >= 0 && syn_nodes[i].input >= 0) {   // pick up the cable
-            drag = DRAG_WIRE; drag_node = syn_nodes[i].input;
-            syn_disconnect(i);
+        if ((i = in_port_at(x, y, &port)) >= 0 && node_in(&syn_nodes[i], port) >= 0) {   // pick up the cable
+            drag = DRAG_WIRE; drag_node = node_in(&syn_nodes[i], port);
+            syn_disconnect_port(i, port);
             return;
         }
         if ((i = node_at(x, y)) >= 0) {
@@ -471,14 +505,21 @@ void synth_page_touch(bool down, bool held, bool up, int x, int y) {
     }
 
     if (up) {
+        bool canvas_tap = !drag_moved && in_canvas(down_x, down_y) &&
+                          (drag == DRAG_WIRE || drag == DRAG_NODE || drag == DRAG_BOX);
         if (drag == DRAG_WIRE) {
-            int dst = in_port_at(cur_x, cur_y);
-            if (dst < 0) dst = node_at(cur_x, cur_y);
-            if (dst >= 0) syn_connect(drag_node, dst);
+            int port = 0;
+            int dst = in_port_at(cur_x, cur_y, &port);
+            if (dst < 0 && (dst = node_at(cur_x, cur_y)) >= 0) {   // dropped on a node body: first free input
+                const SynNode *d = &syn_nodes[dst];
+                port = d->input >= 0 && syn_classes[d->type].has_input2 && d->input2 < 0 ? 1 : 0;
+            }
+            if (dst >= 0) syn_connect_port(drag_node, dst, port);
         } else if (drag == DRAG_NODE && !drag_moved) {
             clear_selection();
             selected[drag_node] = true;
-            popup = drag_node;
+            pending_popup = drag_node;                    // opens unless a second tap follows
+            pending_frame = frame;
         } else if (drag == DRAG_BOX) {
             clear_selection();
             if (drag_moved) {
@@ -498,12 +539,18 @@ void synth_page_touch(bool down, bool held, bool up, int x, int y) {
             int i = syn_add_node(car_order[drag_class], nx, ny);
             if (i >= 0) { clear_selection(); selected[i] = true; }
         }
+        if (canvas_tap) { last_tap_frame = frame; last_tap_x = down_x; last_tap_y = down_y; }
         drag = DRAG_NONE;
         tb_pressed = -1;
     }
 }
 
 void synth_page_buttons(u32 kDown, u32 kHeld) {
+    frame++;                                      // called once per frame on this page
+    if (pending_popup >= 0 && frame - pending_frame > DT_FRAMES) {
+        if (syn_nodes[pending_popup].used && drag == DRAG_NONE) popup = pending_popup;
+        pending_popup = -1;
+    }
     if (popup >= 0) return;
     if (kDown & KEY_L) zoom_by(1 / 1.25f);
     if (kDown & KEY_R) zoom_by(1.25f);
@@ -533,6 +580,7 @@ static void node_subtitle(const SynNode *n, char *out, size_t len) {
         break;
     }
     case NODE_GRAINS:  snprintf(out, len, "%d ms%s", (int)lroundf(n->p[GR_SIZE]), n->p[GR_FREEZE] >= 0.5f ? " FRZ" : ""); break;
+    case NODE_XFADE:   snprintf(out, len, "A %d%% B %s", (int)lroundf(n->p[XF_MIX] * 100), (int)n->p[XF_CURVE] == XC_EQPOWER ? "EQ" : "LIN"); break;
     default:         out[0] = 0;
     }
 }
@@ -553,9 +601,13 @@ static void draw_canvas(void) {
     u32 wire = C2D_Color32(175, 180, 195, 255);
     for (int i = 0; i < SYN_MAX_NODES; i++) {
         const SynNode *n = &syn_nodes[i];
-        if (!n->used || n->input < 0) continue;
-        const SynNode *s = &syn_nodes[n->input];
-        C2D_DrawLine(sx(s->x + NODE_W), port_sy(s), wire, sx(n->x), port_sy(n), wire, 1.5f, 0.5f);
+        if (!n->used) continue;
+        for (int p = 0; p < 2; p++) {
+            int src = node_in(n, p);
+            if (src < 0 || src >= SYN_MAX_NODES || !syn_nodes[src].used) continue;
+            const SynNode *s = &syn_nodes[src];
+            C2D_DrawLine(sx(s->x + NODE_W), port_sy(s), wire, sx(n->x), in_port_sy(n, p), wire, 1.5f, 0.5f);
+        }
     }
     if (drag == DRAG_WIRE) {
         const SynNode *s = &syn_nodes[drag_node];
@@ -587,8 +639,12 @@ static void draw_canvas(void) {
             node_subtitle(n, sub, sizeof sub);
             text(x + 5 * zoom, y + 16 * zoom, 0.32f * zoom, COL_DIM, 0, "%s", sub);
         }
-        if (c->has_input)
-            C2D_DrawRectSolid(x - pt / 2, port_sy(n) - pt / 2, 0.5f, pt, pt, n->input >= 0 ? wire : COL_LINE);
+        for (int p = 0; p < (c->has_input2 ? 2 : c->has_input ? 1 : 0); p++) {
+            float py = in_port_sy(n, p);
+            C2D_DrawRectSolid(x - pt / 2, py - pt / 2, 0.5f, pt, pt, node_in(n, p) >= 0 ? wire : COL_LINE);
+            if (c->has_input2 && zoom >= 0.7f)      // A / B labels beside the ports
+                text(x - pt / 2 - 1, py - 5 * zoom, 0.28f * zoom, COL_DIM, C2D_AlignRight, "%s", p ? "B" : "A");
+        }
         C2D_DrawRectSolid(x + w - pt / 2, port_sy(n) - pt / 2, 0.5f, pt, pt, wire);
     }
 
@@ -653,3 +709,9 @@ void synth_page_draw(void) {
     draw_carousel();
     draw_toolbar();
 }
+
+#ifndef __3DS__
+// Host-only hooks for the screenshot renderer's gesture checks
+float synth_dbg_sx(float x) { return sx(x); }
+float synth_dbg_sy(float y) { return sy(y); }
+#endif

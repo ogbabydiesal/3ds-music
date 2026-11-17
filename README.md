@@ -179,7 +179,7 @@ The OSC, gyro and accel choices are saved to `sdmc:/3ds/nodeTrix/settings.ini`. 
 
 ### STEPS page (step sequencers S1–S8)
 
-| S1 playing a melody | Assigning S1 to an oscillator's FREQ |
+| S1 sweeping a filter, with a 120 ms LOG slew | Assigning S1 to the FILTER's CUTOFF |
 |---|---|
 | ![STEPS page](docs/screenshots/steps-1-lane.png) | ![Assigning in node settings](docs/screenshots/steps-2-assign.png) |
 
@@ -187,6 +187,7 @@ The third page, after SEQUENCER and SYNTH (use **< >**), has **8 step sequencers
 - **TRIG:** which shape's pulses advance it. Every pulse moves to the next slider, just before that pulse's note plays. After the last slider it loops to the first, and PLAY restarts all of them at step 1.
 - **STEPS:** 1–16 sliders.
 - **MIN / MAX:** tap to type plain numbers on the 3DS keypad (`.` and `-` work). The output is `MIN + (MAX − MIN) × slider`, so you pick the range that suits the parameter, e.g. 55 to 220 for Hz, or 20 to 400 for a decay in ms.
+- **SLEW:** tap to type a glide time in ms (0 = jump, up to 10 s). Each new step glides in over that time instead of jumping. The button beside it switches the curve: **LIN** (straight line) or **LOG** (fast at first, easing in). A new step mid-glide carries on from where it got to.
 - **Sliders:** drag across them to draw. The playing step is outlined, and the readout shows the touched step's value.
 - The row under MIN/MAX lists what the selected sequencer **drives**. A small dot on a tab means that sequencer is in use.
 
@@ -200,7 +201,7 @@ Sequencers and their assignments are saved in slots along with the synth patch. 
 
 Use the **<** and **>** buttons at the right of the bottom bar to switch pages: SEQUENCER → SYNTH → STEPS.
 
-- **Carousel** (top row): **OSC**, **NOISE**, **ENV**, **REVERB** and **GRAINS** (scroll with **<** / **>**). Tap a class to add it to the canvas, or drag it to place it.
+- **Carousel** (top row): sources (**OSC**, **NOISE**, **SAMPLE**, **MIC**), then **ENV**, **FILTER**, **XFADE**, **DELAY**, **CHORUS**, **REVERB** and **GRAINS** (scroll with **<** / **>**). Tap a class to add it to the canvas, or drag it to place it.
   - **OSC**: WAVE (SINE, TRI, SAW, SQR, CUST), FREQ (20–4000 Hz), PW (pulse width for SQR), MOD and LEVEL. Choosing **CUST** shows a 16-point waveform you draw with the stylus. The OSC input bends pitch by MOD octaves, so patch an ENV into it for kick drums and zaps.
   - **NOISE**: TYPE (WHITE, PINK, BROWN) and LEVEL.
   - **ENV**: ATTACK, DECAY, SUSTAIN, RELEASE, LENGTH and LEVEL. It shapes the volume of whatever is patched into it. With nothing plugged in, it outputs the envelope shape itself, which is useful for modulating an OSC.
@@ -210,6 +211,7 @@ Use the **<** and **>** buttons at the right of the bottom bar to switch pages: 
   - **FILTER**: a resonant state-variable filter (LP, HP, BP, NOTCH) with CUTOFF and Q.
   - **DELAY**: a feedback delay of up to 2 s with a filter in the loop. Settings: TIME (glides like tape), FEEDBACK, FILTER type, CUTOFF, Q, MIX and LEVEL.
   - **CHORUS**: a one-knob, early-'90s-style analog chorus. Settings: RATE, a LOW/HIGH DEPTH switch, MIX and LEVEL.
+  - **XFADE**: two inputs, **A** (top) and **B** (bottom), blended by MIX (0% = A, 100% = B) with a LIN or EQ PWR (constant loudness) CURVE. Stereo inputs stay stereo. Put MIX on an S box to fade or switch between sounds in time.
   - **GRAINS**: a granular texture processor, an implementation of the Mutable Instruments Beads algorithm (credited in Settings → CREDITS). It records its input into an 8 s buffer and plays up to 16 stereo grains. Settings: TIME, SIZE, SHAPE, PITCH, DENSITY (steady or random), RANDOM, FEEDBACK, MIX, DIR (forward/reverse/both) and FREEZE. Shape pulses seed grains, like Beads' SEED.
 - **Toolbar:**
   - **BOX / PAN** sets what dragging on empty canvas does: box-select or pan.
@@ -217,8 +219,8 @@ Use the **<** and **>** buttons at the right of the bottom bar to switch pages: 
   - **COPY**, **PASTE** and **DEL** act on the selected nodes. Paste keeps the links between the copied nodes, offsets each paste a little, and leaves the pasted outputs off.
 - **Canvas:**
   - Drag a node to move it. Dragging a selected node moves the whole selection.
-  - To patch, drag from a node's right **output** square to another node's left **input** square. Drag a cable off an input to unplug it.
-  - **L / R** zoom and the **D-pad** pans.
+  - To patch, drag from a node's right **output** square to another node's left **input** square. Drag a cable off an input to unplug it. One output can feed **any number of inputs**: just drag another cable from it.
+  - **Double-tap and hold** anywhere on the canvas to pan. **L / R** zoom and the **D-pad** pans too.
 - **Tap a node** to open its settings:
   - Sliders and choices for that class.
   - **OUTPUT** (OFF by default): pick any combination of shapes 1–5. Only output nodes are heard, and envelopes feeding an output are triggered by those shapes' pulses. Output nodes show small coloured squares on the canvas.

@@ -192,7 +192,10 @@ static void render(const char *path, bool playing) {
 }
 
 // Stylus helpers
-static void tap(int x, int y) { synth_page_touch(true, true, false, x, y); synth_page_touch(false, false, true, x, y); }
+// Let ~20 frames pass (a tapped node's settings open after the double-tap window)
+static void settle(void) { for (int i = 0; i < 20; i++) synth_page_buttons(0, 0); }
+static void tap_now(int x, int y) { synth_page_touch(true, true, false, x, y); synth_page_touch(false, false, true, x, y); }
+static void tap(int x, int y) { tap_now(x, y); settle(); }
 static void press(int x, int y) { synth_page_touch(true, true, false, x, y); }
 static void move(int x, int y) { synth_page_touch(false, true, false, x, y); }
 static void release_at(int x, int y) { synth_page_touch(false, false, true, x, y); }
@@ -388,27 +391,80 @@ int main(int argc, char **argv) {
     render(OUT("store-2-song.png"), true);
     store_ui_close();
 
-    // STEPS page: S1 plays a melody on the kick OSC's FREQ (sphere pulses);
-    // S2 steps the hi-hat ENV decay (cube pulses). Assignments live in the nodes.
+    // STEPS page: S1 sweeps the SAMPLE -> FILTER cutoff (sphere pulses);
+    // S2 steps the DELAY time (cube pulses). Assignments live in the nodes.
     scene_page = 2;
     ModSeq *S1 = &mod_seqs[0], *S2 = &mod_seqs[1];
-    S1->trig = 1; S1->nsteps = 8; S1->min = 55; S1->max = 220;
+    S1->trig = 1; S1->nsteps = 8; S1->min = 300; S1->max = 3000;
     const float mel[8] = { 0, .5f, .25f, .75f, 0, 1, .5f, .38f };
     for (int i = 0; i < 8; i++) S1->v[i] = mel[i];
-    S2->trig = 0; S2->nsteps = 4; S2->min = 40; S2->max = 300;
-    syn_set_mod_src(os, OSC_FREQ, 0);
-    syn_set_mod_src(1, ENV_D, 1);
+    S1->slew_ms = 120; S1->slew_curve = SLEW_LOG;   // glide between notes
+    S2->trig = 0; S2->nsteps = 4; S2->min = 120; S2->max = 500;
+    syn_set_mod_src(nf, FLT_CUTOFF, 0);
+    syn_set_mod_src(nd, DLY_CUTOFF, -1);
+    syn_set_mod_src(nd, DLY_TIME, 1);
     mod_reset();
     for (int i = 0; i < 3; i++) mod_on_pulse(1);  // now playing step 3
     mod_page_touch(true, true, false, 4 + 5 * 39 + 10, 150);   // touch slider 6 (sets it + readout)
     mod_page_touch(false, false, true, 4 + 5 * 39 + 10, 150);
     render(OUT("steps-1-lane.png"), true);
 
-    // OSC settings with FREQ driven by S1
+    // FILTER settings with CUTOFF driven by S1
     scene_page = 1;
-    synth_page_open_popup(os);
+    synth_page_open_popup(nf);
     render(OUT("steps-2-assign.png"), true);
     tap(2, 2);
     store_ui_close();
+
+    // XFADE: one OSC fans out to a LP and a HP FILTER; XFADE blends them (S3
+    // sweeps MIX with a slew), then REVERB. Shape 4 plays it.
+    syn_init();
+    syn_delete_node(0); syn_delete_node(1);
+    int xo = syn_add_node(NODE_OSC, 10, 50), xe = syn_add_node(NODE_ENV, 90, 50);
+    int xl = syn_add_node(NODE_FILTER, 170, 20), xh = syn_add_node(NODE_FILTER, 170, 80);
+    int xx = syn_add_node(NODE_XFADE, 250, 50), xr = syn_add_node(NODE_REVERB, 330, 50);
+    syn_connect(xo, xe); syn_connect(xe, xl); syn_connect(xe, xh);
+    syn_connect_port(xl, xx, 0); syn_connect_port(xh, xx, 1); syn_connect(xx, xr);
+    syn_toggle_output(xr, 3);
+    syn_set_param(xo, OSC_WAVE, WAVE_SAW); syn_set_param(xo, OSC_FREQ, 110);
+    syn_set_param(xl, FLT_CUTOFF, 600); syn_set_param(xh, FLT_TYPE, FT_HP); syn_set_param(xh, FLT_CUTOFF, 2500);
+    syn_set_param(xx, XF_MIX, 0.35f);
+    syn_set_mod_src(xx, XF_MIX, 2);
+    mod_seqs[2].trig = 3; mod_seqs[2].nsteps = 4; mod_seqs[2].slew_ms = 180; mod_seqs[2].slew_curve = SLEW_LOG;
+    tap(BOT_W - 10, 36); tap(BOT_W - 10, 36);    // carousel > > (shows ENV FILTER XFADE)
+    tap(105, 61);                                // % : fit
+    render(OUT("synth-15-xfade.png"), false);
+    synth_page_open_popup(xx);
+    render(OUT("synth-16-xfade-settings.png"), false);
+    tap(2, 2);
+
+    // Gesture check: double tap and hold on a node pans the view; the node stays put
+    {
+        float nx0 = syn_nodes[xx].x, ny0 = syn_nodes[xx].y;
+        int cx = 4 + 156, cy = 73 + 64;
+        for (int i = 0; i < SYN_MAX_NODES; i++)          // aim at XFADE's centre on screen
+            if (i == xx) { extern float synth_dbg_sx(float), synth_dbg_sy(float);
+                           cx = (int)synth_dbg_sx(syn_nodes[i].x + 32); cy = (int)synth_dbg_sy(syn_nodes[i].y + 15); }
+        float p0x = synth_dbg_sx(0), p0y = synth_dbg_sy(0);
+        tap_now(cx, cy);                                 // tap 1 (would open settings later)
+        synth_page_buttons(0, 0); synth_page_buttons(0, 0);
+        press(cx, cy);                                   // tap 2, held
+        for (int i = 1; i <= 10; i++) move(cx + 4 * i, cy + 2 * i);
+        release_at(cx + 40, cy + 20);
+        settle();
+        bool panned = fabsf(synth_dbg_sx(0) - p0x - 40) < 1 && fabsf(synth_dbg_sy(0) - p0y - 20) < 1;
+        bool still = syn_nodes[xx].x == nx0 && syn_nodes[xx].y == ny0;
+        printf("%s double-tap-hold on a node pans (%.0f, %.0f px), node unmoved %d, settings closed %d\n",
+               panned && still && !synth_page_popup_open() ? "PASS" : "FAIL",
+               synth_dbg_sx(0) - p0x, synth_dbg_sy(0) - p0y, still, !synth_page_popup_open());
+        tap_now(cx + 40, cy + 20); settle();             // a single tap still opens settings
+        printf("%s single tap still opens settings\n", synth_page_popup_open() ? "PASS" : "FAIL");
+        tap(2, 2);
+        float q0x = synth_dbg_sx(0);                    // slow second tap: no pan (box select instead)
+        tap_now(10, 190); settle(); press(10, 190); for (int i = 1; i <= 5; i++) move(10 + 6 * i, 190); release_at(40, 190);
+        printf("%s two slow taps don't pan\n", synth_dbg_sx(0) == q0x ? "PASS" : "FAIL");
+    }
+    tap(10, 36); tap(10, 36);                    // carousel back
+
     return 0;
 }

@@ -29,6 +29,7 @@ void mod_init(void) { mod_defaults(mod_seqs); }
 
 void mod_reset(void) {
     for (int i = 0; i < MOD_SEQS; i++) mod_seqs[i].cur = -1;
+    syn_mod_reset();
 }
 
 float mod_seq_value(const ModSeq *m, int step) {
@@ -43,14 +44,7 @@ void mod_on_pulse(int track) {
         int c = m->cur + 1;
         if (c >= m->nsteps) c = 0;
         m->cur = c;
-        float val = mod_seq_value(m, c);
-        for (int n = 0; n < SYN_MAX_NODES; n++) {
-            const SynNode *node = &syn_nodes[n];
-            if (!node->used) continue;
-            const NodeClass *cls = &syn_classes[node->type];
-            for (int k = 0; k < cls->nparams; k++)
-                if (node->mod_src[k] == i) syn_set_param(n, k, syn_clamp_param(&cls->params[k], val));
-        }
+        syn_mod_target(i, mod_seq_value(m, c), m->slew_ms, m->slew_curve);
     }
 }
 
@@ -61,6 +55,9 @@ void mod_set_all(const ModSeq src[MOD_SEQS]) {
         if (m->nsteps < 1) m->nsteps = 1;
         if (m->nsteps > MOD_MAX_STEPS) m->nsteps = MOD_MAX_STEPS;
         if (m->trig < 0 || m->trig > 4) m->trig = 0;
+        if (!(m->slew_ms >= 0)) m->slew_ms = 0;          // also catches NaN
+        if (m->slew_ms > MOD_MAX_SLEW) m->slew_ms = MOD_MAX_SLEW;
+        m->slew_curve = m->slew_curve == SLEW_LOG ? SLEW_LOG : SLEW_LIN;
         m->cur = -1;
     }
 }
@@ -87,9 +84,13 @@ int mod_seq_targets(int seq) {
 #define SL_H   86
 #define TAB_W  37
 #define TAB_GAP 2
-#define MIN_X  32
-#define MAX_X  140
-#define FIELD_W 70
+#define MIN_X  30
+#define MAX_X  120
+#define FIELD_W 58
+#define SLEW_X 210          // slew time field
+#define SLEW_W 50
+#define CURVE_X 264         // LIN / LOG toggle
+#define CURVE_W 52
 
 static int  sel = 0;
 static int  shown_step = -1;
@@ -155,6 +156,9 @@ void mod_page_touch(bool down, bool held, bool up, int x, int y) {
             float v;
             if (in_rect(x, y, MIN_X, R3_Y, FIELD_W, ROW_H) && keyboard_number("MIN value", m->min, &v)) m->min = v;
             if (in_rect(x, y, MAX_X, R3_Y, FIELD_W, ROW_H) && keyboard_number("MAX value", m->max, &v)) m->max = v;
+            if (in_rect(x, y, SLEW_X, R3_Y, SLEW_W, ROW_H) && keyboard_number("SLEW (ms, 0 = jump)", m->slew_ms, &v))
+                m->slew_ms = v < 0 ? 0 : v > MOD_MAX_SLEW ? MOD_MAX_SLEW : v;
+            if (in_rect(x, y, CURVE_X, R3_Y, CURVE_W, ROW_H)) m->slew_curve = m->slew_curve == SLEW_LOG ? SLEW_LIN : SLEW_LOG;
             return;
         }
         if (in_rect(x, y, SL_X, SL_Y - 4, SL_W, SL_H + 8)) drawing = true;
@@ -168,12 +172,16 @@ static void small_btn(float x, float y, float w, const char *label) {
     text(x + w / 2, y + 2, 0.4f, COL_FG, C2D_AlignCenter, "%s", label);
 }
 
+static void field_text(float x, float y, float w, const char *s) {
+    C2D_DrawRectSolid(x, y, 0.5f, w, ROW_H, C2D_Color32(14, 17, 21, 255));
+    rect_outline(x, y, w, ROW_H, COL_LINE);
+    text(x + w - 5, y + 2, 0.4f, COL_FG, C2D_AlignRight, "%s", s);
+}
+
 static void field(float x, float y, float v) {
     char s[24];
     fmt_num(v, s, sizeof s);
-    C2D_DrawRectSolid(x, y, 0.5f, FIELD_W, ROW_H, C2D_Color32(14, 17, 21, 255));
-    rect_outline(x, y, FIELD_W, ROW_H, COL_LINE);
-    text(x + FIELD_W - 6, y + 2, 0.4f, COL_FG, C2D_AlignRight, "%s", s);
+    field_text(x, y, FIELD_W, s);
 }
 
 void mod_page_draw(void) {
@@ -202,21 +210,39 @@ void mod_page_draw(void) {
     text(278, R2_Y + 2, 0.42f, COL_FG, C2D_AlignCenter, "%d", m->nsteps);
     small_btn(294, R2_Y, 22, "+");
 
-    // R3: MIN / MAX (tap to type) + readout
+    // R3: MIN / MAX / SLEW (tap to type) + curve toggle
     text(4, R3_Y + 3, 0.36f, COL_DIM, 0, "MIN");
     field(MIN_X, R3_Y, m->min);
-    text(MAX_X - 28, R3_Y + 3, 0.36f, COL_DIM, 0, "MAX");
+    text(MAX_X - 25, R3_Y + 3, 0.36f, COL_DIM, 0, "MAX");
     field(MAX_X, R3_Y, m->max);
+    text(SLEW_X - 29, R3_Y + 3, 0.36f, COL_DIM, 0, "SLEW");
+    char sl[16];
+    if (m->slew_ms >= 1000) snprintf(sl, sizeof sl, "%.1fs", m->slew_ms / 1000.0f);
+    else snprintf(sl, sizeof sl, "%dms", (int)lroundf(m->slew_ms));
+    field_text(SLEW_X, R3_Y, SLEW_W, sl);
+    {   // LIN / LOG, with a tiny picture of the curve
+        bool on = m->slew_ms > 0;
+        C2D_DrawRectSolid(CURVE_X, R3_Y, 0.5f, CURVE_W, ROW_H, COL_BTN);
+        text(CURVE_X + 4, R3_Y + 2, 0.4f, on ? COL_FG : COL_DIM, 0, "%s", m->slew_curve == SLEW_LOG ? "LOG" : "LIN");
+        float gx = CURVE_X + 32, gy = R3_Y + ROW_H - 4, gw = 16, gh = ROW_H - 8;
+        u32 col = on ? COL_ACCENT : COL_DIM;
+        for (int i = 0; i < 8; i++) {
+            float t0 = i / 8.0f, t1 = (i + 1) / 8.0f;
+            C2D_DrawLine(gx + gw * t0, gy - gh * syn_slew_shape(m->slew_curve, t0), col,
+                         gx + gw * t1, gy - gh * syn_slew_shape(m->slew_curve, t1), col, 1.2f, 0.5f);
+        }
+    }
+
+    // R4: what this sequencer drives, and the step being shown
     int rs = shown_step >= 0 && shown_step < m->nsteps ? shown_step : m->cur;
     if (rs >= 0) {
         char v[24];
         fmt_num(mod_seq_value(m, rs), v, sizeof v);
-        text(BOT_W - 6, R3_Y + 3, 0.38f, COL_FG, C2D_AlignRight, "step %d = %s", rs + 1, v);
+        text(BOT_W - 6, R4_Y + 3, 0.36f, COL_FG, C2D_AlignRight, "step %d = %s", rs + 1, v);
     }
-
-    // R4: what this sequencer drives
     if (!ntargets) {
-        text(4, R4_Y + 3, 0.32f, COL_DIM, 0, "Not assigned. Tap a parameter's S box in a SYNTH node's settings.");
+        text(4, R4_Y + 3, 0.32f, COL_DIM, 0, rs >= 0 ? "Not assigned: tap an S box in a node's settings."
+                                                    : "Not assigned. Tap a parameter's S box in a SYNTH node's settings.");
     } else {
         char list[160] = "drives ";
         int shown = 0;
@@ -228,7 +254,7 @@ void mod_page_draw(void) {
                 if (node->mod_src[k] != sel) continue;
                 char item[32];
                 snprintf(item, sizeof item, "%s%s %d %s", shown ? ", " : "", c->name, n + 1, c->params[k].name);
-                if (strlen(list) + strlen(item) < 60) strncat(list, item, sizeof list - strlen(list) - 1);
+                if (strlen(list) + strlen(item) < (rs >= 0 ? 44u : 60u)) strncat(list, item, sizeof list - strlen(list) - 1);
                 else if (!strstr(list, "...")) strncat(list, ", ...", sizeof list - strlen(list) - 1);
                 shown++;
             }

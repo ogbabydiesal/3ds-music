@@ -85,7 +85,7 @@ static bool write_slot(int slot, const Pattern *p, const SynNode *nodes) {
         for (int k = 0; k < SYN_MAX_PARAMS; k++) fprintf(f, " %g", n->p[k]);
         for (int k = 0; k < SYN_WT_SIZE; k++) fprintf(f, " %g", n->wt[k]);
         for (int k = 0; k < SYN_MAX_PARAMS; k++) fprintf(f, " %d", n->mod_src[k]);   // S1..S8 per param
-        fputc('\n', f);
+        fprintf(f, " %d\n", n->input2);                                // XFADE input B (added in 0.5)
         if (n->type == NODE_SAMPLE && samples_count()) {              // the file by name: indexes shift
             const Sample *sm = samples_get(((int)n->p[SMP_FILE]) % samples_count());
             if (sm) fprintf(f, "sample %d %s\n", i, sm->name);
@@ -95,7 +95,7 @@ static bool write_slot(int slot, const Pattern *p, const SynNode *nodes) {
         const ModSeq *m = &mod_seqs[i];
         fprintf(f, "seq %d %d %d %g %g", i, m->trig, m->nsteps, m->min, m->max);
         for (int k = 0; k < MOD_MAX_STEPS; k++) fprintf(f, " %g", m->v[k]);
-        fputc('\n', f);
+        fprintf(f, " %g %d\n", m->slew_ms, m->slew_curve);              // added in 0.5
     }
     fclose(f);
     return true;
@@ -128,7 +128,7 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             p->tr[a].mute = e != 0;
         } else if (seqs && !strncmp(line, "seq ", 4)) {
             char *tok = strtok(line + 4, " \n");
-            float v[5 + MOD_MAX_STEPS];
+            float v[5 + MOD_MAX_STEPS + 2];
             int nv = 0;
             while (tok && nv < (int)(sizeof v / sizeof v[0])) { v[nv++] = strtof(tok, NULL); tok = strtok(NULL, " \n"); }
             int i = nv ? (int)v[0] : -1;
@@ -136,6 +136,7 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             ModSeq *m = &seqs[i];
             m->trig = (int)v[1]; m->nsteps = (int)v[2]; m->min = v[3]; m->max = v[4];
             for (int k = 0; k < MOD_MAX_STEPS && 5 + k < nv; k++) m->v[k] = v[5 + k];
+            if (nv >= 5 + MOD_MAX_STEPS + 2) { m->slew_ms = v[5 + MOD_MAX_STEPS]; m->slew_curve = (int)v[6 + MOD_MAX_STEPS]; }
         } else if (nodes && !strncmp(line, "sample ", 7)) {           // after its node line
             char name[SAMPLES_NAME_LEN];
             if (sscanf(line, "sample %d %39s", &a, name) == 2 && a >= 0 && a < SYN_MAX_NODES && nodes[a].used) {
@@ -144,7 +145,7 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             }
         } else if (nodes && !strncmp(line, "node ", 5)) {
             char *tok = strtok(line + 5, " \n");
-            float v[6 + SYN_MAX_PARAMS + SYN_WT_SIZE + SYN_MAX_PARAMS];
+            float v[6 + SYN_MAX_PARAMS + SYN_WT_SIZE + SYN_MAX_PARAMS + 1];
             int nv = 0;
             while (tok && nv < (int)(sizeof v / sizeof v[0])) { v[nv++] = strtof(tok, NULL); tok = strtok(NULL, " \n"); }
             if (nv < 6 + np) continue;
@@ -162,6 +163,8 @@ static bool read_slot(int slot, Pattern *p, SynNode *nodes, ModSeq *seqs) {
             for (int k = 0; k < SYN_WT_SIZE && 6 + np + k < nv; k++) n->wt[k] = v[6 + np + k];
             int ms = 6 + np + SYN_WT_SIZE;                  // S1..S8 assignments (absent in older saves)
             for (int k = 0; k < SYN_MAX_PARAMS; k++) n->mod_src[k] = k < np && ms + k < nv ? (int8_t)(int)v[ms + k] : -1;
+            int i2 = ms + SYN_MAX_PARAMS;                   // input B (absent before 0.5)
+            n->input2 = np == SYN_MAX_PARAMS && i2 < nv ? (int)v[i2] : -1;
         }
     }
     fclose(f);
