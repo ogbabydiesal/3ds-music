@@ -155,7 +155,11 @@ void settings_draw(void) {
 
     char port[8];
     snprintf(port, sizeof port, "%d", net_cfg.port);
+#ifdef NT_DESKTOP
+    const char *labels[NROWS] = { "OSC OUTPUT", "TARGET IP", "PORT", "GYRO", "ACCEL", "THIS MAC" };
+#else
     const char *labels[NROWS] = { "OSC OUTPUT", "TARGET IP", "PORT", "GYRO", "ACCEL", "THIS 3DS" };
+#endif
     for (int r = 0; r < NROWS; r++) {
         float y = row_y(r);
         if (r > 0) C2D_DrawRectSolid(SX + 8, y, 0.5f, SW - 16, 1, C2D_Color32(38, 46, 55, 255));

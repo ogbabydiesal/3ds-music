@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ogbabydiesal/nodeTrix/actions/workflows/ci.yml/badge.svg)](https://github.com/ogbabydiesal/nodeTrix/actions/workflows/ci.yml)
 
-Homebrew music tools for the Nintendo 3DS, written in C with [libctru](https://github.com/devkitPro/libctru) and citro2d. Two apps:
+Homebrew music tools for the Nintendo 3DS (nodeTrix also runs on macOS), written in C with [libctru](https://github.com/devkitPro/libctru) and citro2d. Two apps:
 
 - **osc3ds** turns the 3DS into a wireless **OSC controller**: buttons, sticks, an XY pad, faders, drum pads and motion sensors, sent over UDP on Wi-Fi.
 - **nodeTrix** is a **stereoscopic 3D polyrhythmic / Euclidean sequencer** with a built-in **modular synth**. Five wireframe shape tracks orbit a ring on the 3D top screen. Each pulse sends OSC (`/shape_N/pulse`) and can play patches you build from oscillators, noise, sound files, the microphone, envelopes, a filter, delay, chorus, reverb and a granular processor on the touchscreen.
@@ -22,6 +22,35 @@ Ready-to-run builds are on the [**Releases**](https://github.com/ogbabydiesal/no
 To install, copy the `.3dsx` files to `/3ds/` on your SD card and launch them from the Homebrew Launcher. You need a 3DS with custom firmware. nodeTrix's sound also needs `sdmc:/3ds/dspfirm.cdc`, which you create with the DSP1 homebrew.
 
 To make release builds yourself, run `make release`. It writes both files to `dist/`.
+
+## Mac version
+
+nodeTrix also runs on macOS 11 or later, on Apple silicon and Intel. It isn't a port: the Mac app compiles the same `sequencer/source` code as the 3DS, so every feature is the same. One window shows both screens, with the top screen above and the bottom screen below. You can resize it.
+
+<img src="docs/screenshots/mac-synth.png" width="320" alt="nodeTrix on macOS, SYNTH page">
+
+```bash
+make -C platform/macos run
+```
+
+This builds `platform/macos/build/nodeTrix.app` and opens it. It needs only Xcode's command line tools. `make -C platform/macos zip` makes a zip to share. The app is signed only for this Mac (ad hoc), so on another Mac the first launch needs right-click → **Open**.
+
+| 3DS | Mac |
+|---|---|
+| Stylus on the bottom screen | Mouse |
+| Circle pad (turn the 3D view) | Drag on the top screen |
+| A (play / stop) | Space or A |
+| B (back to the start of the bar) | B or Delete |
+| D-pad | Arrow keys |
+| L / R | Q / W |
+| ZL / ZR | 1 / 2 |
+| X / Y | X / Y |
+| SELECT (settings) | Tab |
+| System keyboard | A text box |
+
+Samples, save slots and settings live in `~/Library/Application Support/nodeTrix/` (**nodeTrix menu → Open nodeTrix Folder**). Put `.wav` files in its `samples` folder and restart. Sound plays through the Mac's current output, and a MIC node uses the Mac's microphone, which macOS asks permission for the first time. The 3D slider and the motion sensors have no Mac equivalent.
+
+`make -C platform/macos test` runs the app with no window and no sound. It taps through every page, saves screenshots to `platform/macos/build/selftest/` and checks that the synth makes sound.
 
 ## Screenshots
 
@@ -242,6 +271,7 @@ common/osc.c/.h      portable OSC encoder
 common/netcfg.c/.h   shared config file, UDP socket, IP/port keyboard
 tools/osc_monitor.py desktop receiver for debugging
 tools/test_osc.c     host-side encoder test
+platform/macos/      Mac app: stand-ins for the 3DS libraries (shim/), window, input, CoreAudio (mac_platform.m)
 tools/ui_render/     renders SYNTH page screenshots on macOS from the real UI code
 tests/               host tests for the engine, step sequencers, WAV loader and slot files
 .github/workflows/   CI: builds and tests on every push
@@ -266,7 +296,8 @@ This runs about 70 checks on your computer (macOS or Linux, no 3DS or devkitPro 
 **GitHub Actions** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push and pull request:
 - builds osc3ds and nodeTrix with devkitPro's Docker image (nodeTrix without Arial, like a release); the `.3dsx` files are downloadable from the run;
 - runs the tests on Linux and macOS;
-- renders the screenshots on macOS and fails if a gesture check fails.
+- renders the screenshots on macOS and fails if a gesture check fails;
+- builds the Mac app, runs its self-test, and offers `nodeTrix-macos.zip` for download.
 
 ## Disclaimer and privacy
 

@@ -9,7 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#ifdef __3DS__
+#if defined(__3DS__) || defined(NT_DESKTOP)     // NT_DESKTOP: platform/macos
 static LightLock song_lock;
 #define SONG_LOCK()   LightLock_Lock(&song_lock)
 #define SONG_UNLOCK() LightLock_Unlock(&song_lock)
@@ -264,7 +264,7 @@ void song_status(int *step, int *n, int *bar, int *bars) {
 }
 
 void store_init(void) {
-#ifdef __3DS__
+#if defined(__3DS__) || defined(NT_DESKTOP)
     LightLock_Init(&song_lock);
 #endif
     make_dirs();

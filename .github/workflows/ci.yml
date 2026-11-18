@@ -1,5 +1,5 @@
 # Builds the 3DS apps and runs the host tests on every push and pull request.
-# Later platforms (desktop, iOS, Android) get their own jobs here.
+# Each platform gets its own job (3DS, macOS; iOS and Android later).
 name: CI
 
 on:
@@ -58,4 +58,23 @@ jobs:
         with:
           name: screenshots
           path: docs/screenshots/
+          retention-days: 14
+
+  macos-app:
+    name: macOS app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build nodeTrix.app (Apple silicon + Intel)
+        run: make -C platform/macos
+      - name: Self-test (no window, no sound; taps through the pages, checks the synth makes sound)
+        run: make -C platform/macos test
+      - name: Zip
+        run: make -C platform/macos zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nodeTrix-macos
+          path: |
+            platform/macos/build/nodeTrix-macos.zip
+            platform/macos/build/selftest/*.png
           retention-days: 14

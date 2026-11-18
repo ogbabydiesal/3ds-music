@@ -154,6 +154,7 @@ void net_edit_settings(void) {
 const char *net_local_ip(void) {
     static char s[20];
     u32 ip = (u32)gethostid();
-    snprintf(s, sizeof s, "%lu.%lu.%lu.%lu", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, ip >> 24);
+    snprintf(s, sizeof s, "%lu.%lu.%lu.%lu", (unsigned long)(ip & 0xFF), (unsigned long)((ip >> 8) & 0xFF),
+             (unsigned long)((ip >> 16) & 0xFF), (unsigned long)(ip >> 24));
     return s;
 }

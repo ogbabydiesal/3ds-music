@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef __3DS__
+#if defined(__3DS__) || defined(NT_DESKTOP)        // NT_DESKTOP: a desktop build (platform/macos)
 #include <3ds.h>
 #include <malloc.h>
 static LightLock graph_lock;
@@ -532,7 +532,7 @@ void syn_replace_all(const SynNode src[SYN_MAX_NODES]) {
 }
 
 void syn_init(void) {
-#ifdef __3DS__
+#if defined(__3DS__) || defined(NT_DESKTOP)
     LightLock_Init(&graph_lock);
 #endif
     memset(syn_nodes, 0, sizeof syn_nodes);
@@ -1007,6 +1007,12 @@ static u32 mic_bytes = 0;                               // sample data size insi
 static volatile bool mic_running = false;
 static u32 mic_wr = 0;                                  // writer position (samples), read once per block
 static float mic_rp = 0;
+#elif defined(NT_DESKTOP)
+// The desktop platform layer supplies the microphone at SYN_SAMPLE_RATE.
+bool  plat_mic_start(void);
+void  plat_mic_stop(void);
+float plat_mic_sample(void);                            // audio thread, one sample per call
+static volatile bool mic_running = false;
 #endif
 static float mic_x1 = 0, mic_y1 = 0;                    // DC blocker
 
@@ -1028,6 +1034,8 @@ static inline float process_mic(SynNode *n) {
         mic_rp += 32730.0f / SYN_SAMPLE_RATE;           // the mic runs at 32.73 kHz
         if (mic_rp >= ns) mic_rp -= ns;
     }
+#elif defined(NT_DESKTOP)
+    if (mic_running) x = plat_mic_sample();
 #endif
     float y = x - mic_x1 + 0.995f * mic_y1;
     mic_x1 = x; mic_y1 = y;
@@ -1069,6 +1077,28 @@ void syn_mic_stop(void) {
     GRAPH_UNLOCK();
     MICU_StopSampling();
     micExit();
+}
+
+bool syn_mic_on(void) { return mic_running; }
+#elif defined(NT_DESKTOP)
+void syn_mic_poll(void) {
+    bool want = any_mic_node();
+    if (want && !mic_running) {
+        if (!plat_mic_start()) return;
+        GRAPH_LOCK();
+        mic_running = true;
+        GRAPH_UNLOCK();
+    } else if (!want && mic_running) {
+        syn_mic_stop();
+    }
+}
+
+void syn_mic_stop(void) {
+    if (!mic_running) return;
+    GRAPH_LOCK();
+    mic_running = false;
+    GRAPH_UNLOCK();
+    plat_mic_stop();
 }
 
 bool syn_mic_on(void) { return mic_running; }
@@ -1207,6 +1237,8 @@ void syn_audio_stop(void) {
 
 bool syn_audio_ok(void) { return audio_ok; }
 
+#elif defined(NT_DESKTOP)
+// syn_audio_start / stop / ok live in the platform layer (platform/macos/mac_platform.m).
 #else
 bool syn_audio_start(void) { return false; }
 void syn_audio_stop(void) {}
